@@ -1,0 +1,11 @@
+; ModuleID = 'mila'
+source_filename = "mila"
+
+declare i32 @writeln(i32)
+
+define i32 @main() {
+entry:
+  %0 = call i32 @writeln(i32 0)
+  ret i32 0
+}
+lol
