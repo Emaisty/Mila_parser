@@ -19,16 +19,23 @@
 class Parser {
 public:
     Parser();
+
     ~Parser() = default;
 
     bool Parse();                    // parse
-    const llvm::Module& Generate();  // generate
+    const llvm::Module &Generate();  // generate
+
+    void InitLexan(char *name_of_file);
+
+    void readTokens();
 
 private:
     int getNextToken();
 
     Lexer m_Lexer;                   // lexer is used to read tokens
     int CurTok;                      // to keep the current token
+
+    std::vector<Token> tokens;
 
     llvm::LLVMContext MilaContext;   // llvm context
     llvm::IRBuilder<> MilaBuilder;   // llvm builder

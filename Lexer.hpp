@@ -2,19 +2,7 @@
 #define PJPPROJECT_LEXER_HPP
 
 #include <iostream>
-
-class Lexer {
-public:
-    Lexer() = default;
-    ~Lexer() = default;
-
-    int gettok();
-    const std::string& identifierStr() const { return this->m_IdentifierStr; }
-    int numVal() { return this->m_NumVal; }
-private:
-    std::string m_IdentifierStr;
-    int m_NumVal;
-};
+#include <fstream>
 
 
 /*
@@ -22,50 +10,108 @@ private:
  * Here are all valid tokens:
  */
 enum Token {
-    tok_eof =           -1,
+    tok_eof,
 
     // numbers and identifiers
-    tok_identifier =    -2,
-    tok_number =        -3,
+    tok_identifier,
+    tok_number,
 
     // keywords
-    tok_begin =         -4,
-    tok_end =           -5,
-    tok_const =         -6,
-    tok_procedure =     -7,
-    tok_forward =       -8,
-    tok_function =      -9,
-    tok_if =            -10,
-    tok_then =          -11,
-    tok_else =          -12,
-    tok_program =       -13,
-    tok_while =         -14,
-    tok_exit =          -15,
-    tok_var =           -16,
-    tok_integer =       -17,
-    tok_for =           -18,
-    tok_do =            -19,
+    tok_begin,
+    tok_end,
+    tok_const,
+    tok_procedure,
+    tok_forward,
+    tok_function,
+    tok_if,
+    tok_then,
+    tok_else,
+    tok_program,
+    tok_while,
+    tok_exit,
+    tok_var,
+    tok_integer,
+    tok_for,
+    tok_do,
 
     // 2-character operators
-    tok_notequal =      -20,
-    tok_lessequal =     -21,
-    tok_greaterequal =  -22,
-    tok_assign =        -23,
-    tok_or =            -24,
+    tok_notequal,
+    tok_lessequal,
+    tok_greaterequal,
+    tok_assign,
+    tok_or,
+
+    //less or greater
+    tok_less,
+    tok_greater,
+
+    //equal
+    tok_equal,
 
     // 3-character operators (keywords)
-    tok_mod =           -25,
-    tok_div =           -26,
-    tok_not =           -27,
-    tok_and =           -28,
-    tok_xor =           -29,
+    tok_mod,
+    tok_div,
+    tok_not,
+    tok_and,
+    tok_xor,
 
     // keywords in for loop
-    tok_to =            -30,
-    tok_downto =        -31,
+    tok_to,
+    tok_downto,
 
     // keywords for array
-    tok_array =         -32
+    tok_array,
+
+    //spes symbols
+
+    tok_colon,
+    tok_semicolon,
+
+    //math operators
+    tok_plus,
+    tok_minus,
+    tok_mul,
+
+    //wtf
+    tok_dot
+
+};
+
+typedef enum {
+    LETTER, NUMBER, WHITE_SPACE, END, NO_TYPE, SPE_SYMB
+} InputCharType;
+
+class Lexer {
+public:
+    Lexer() = default;
+
+    ~Lexer() = default;
+
+    Token gettok();
+
+    const std::string &identifierStr() const { return this->m_IdentifierStr; }
+
+    int numVal() { return this->m_NumVal; }
+
+    void InitInput(char *name);
+
+    int readSymbol();
+
+    InputCharType type_of_char();
+
+    Token readString();
+
+    Token readNumber();
+
+    Token readSpe();
+
+private:
+    std::ifstream file;
+
+    int cur_symb = -1;
+
+    std::string m_IdentifierStr;
+    int m_NumVal;
 };
 
 #endif //PJPPROJECT_LEXER_HPP
