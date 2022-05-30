@@ -14,7 +14,7 @@ InputCharType Lexer::type_of_char() {
         return NUMBER;
     else if (cur_symb == EOF || cur_symb == 0)
         return END;
-    else if ((cur_symb >= ':' && cur_symb <= '?') || cur_symb == '+' || cur_symb == '-' || cur_symb == '.')
+    else if ((cur_symb >= ':' && cur_symb <= '?') || (cur_symb >= '(' && cur_symb <= '-'))
         return SPE_SYMB;
     else if (cur_symb <= ' ')
         return WHITE_SPACE;
@@ -32,7 +32,10 @@ const struct {
         {"end",     tok_end},
         {"var",     tok_var},
         {"integer", tok_integer},
-        {"div",     tok_div}
+        {"div",     tok_div},
+        {"mod",     tok_mod},
+        {"readln",  tok_readln},
+        {"writeln", tok_writeln}
 };
 
 
@@ -110,6 +113,15 @@ Token Lexer::readSpe() {
                 return tok_greaterequal;
             }
             return tok_greater;
+        case ',':
+            cur_symb = readSymbol();
+            return tok_comma;
+        case '(':
+            cur_symb = readSymbol();
+            return tok_opbrak;
+        case ')':
+            cur_symb = readSymbol();
+            return tok_clbrak;
 
     }
 }
@@ -145,6 +157,11 @@ void Lexer::InitInput(char *name) {
 
 int Lexer::readSymbol() {
     char c;
-    file >> std::noskipws >> c;
-    return c;
+    if (!file.eof()) {
+        file >> std::noskipws >> c;
+        std::cout << c << std::endl;
+        return c;
+    } else
+        return 0;
+
 }

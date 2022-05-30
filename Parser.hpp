@@ -27,15 +27,56 @@ public:
 
     void InitLexan(char *name_of_file);
 
-    void readTokens();
-
 private:
-    int getNextToken();
+    Token getNextToken();
+
+    //matches
+    void match(Token tok);
+
+    void start_of_prog();
+
+    void vars();
+
+    void vars_rest();
+
+    void consts();
+
+    void consts_rest();
+
+    void vars_and_const();
+
+    void body();
+
+    void command();
+
+    void rest_command();
+
+    void expression();
 
     Lexer m_Lexer;                   // lexer is used to read tokens
-    int CurTok;                      // to keep the current token
+    Token cur_tok;                      // to keep the current token
 
-    std::vector<Token> tokens;
+
+
+    struct Variable {
+        enum Type {
+            integer, float_number
+        };
+        Type type;
+        int int_val;
+        float float_val;
+        bool if_const;
+    };
+
+    //name of prog
+    std::string name_of_prog;
+
+    //variables
+    std::map<std::string, Variable> var;
+
+    //var read from line
+    std::vector<std::string> line_vars;
+
 
     llvm::LLVMContext MilaContext;   // llvm context
     llvm::IRBuilder<> MilaBuilder;   // llvm builder

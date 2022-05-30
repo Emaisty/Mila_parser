@@ -73,7 +73,17 @@ enum Token {
     tok_mul,
 
     //wtf
-    tok_dot
+    tok_dot,
+    tok_comma,
+    tok_opbrak,
+    tok_clbrak,
+    tok_opfigbrak,
+    tok_clfigbrak,
+
+
+    //read write
+    tok_readln,
+    tok_writeln
 
 };
 

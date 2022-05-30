@@ -15,7 +15,6 @@ int main(int argc, char *argv[]) {
     }
 
     parser.InitLexan(name);
-    parser.readTokens();
     if (!parser.Parse()) {
         return 1;
     }
