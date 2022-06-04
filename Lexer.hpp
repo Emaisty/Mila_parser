@@ -30,7 +30,7 @@ enum Token {
     tok_while,
     tok_exit,
     tok_var,
-    tok_integer,
+    tok_integer, //16
     tok_for,
     tok_do,
 
@@ -52,7 +52,7 @@ enum Token {
     tok_mod,
     tok_div,
     tok_not,
-    tok_and,
+    tok_and, //30
     tok_xor,
 
     // keywords in for loop
@@ -70,7 +70,7 @@ enum Token {
     //math operators
     tok_plus,
     tok_minus,
-    tok_mul,
+    tok_mul, // 39
 
     //wtf
     tok_dot,

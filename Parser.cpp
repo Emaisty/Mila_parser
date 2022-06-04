@@ -49,6 +49,7 @@ void Parser::vars() {
         new_var.if_const = false;
         new_var.type = Variable::integer;
         var.insert(std::make_pair(line_vars[0], new_var));
+        //llvm::AllocaInst()
         line_vars.erase(line_vars.begin(), line_vars.begin() + 1);
     }
     match(tok_semicolon);
@@ -110,13 +111,11 @@ void Parser::vars_and_const() {
         case tok_var:
             cur_tok = getNextToken();
             vars();
-            cur_tok = getNextToken();
             vars_and_const();
             return;
         case tok_const:
             cur_tok = getNextToken();
             consts();
-            cur_tok = getNextToken();
             vars_and_const();
             return;
         default:
@@ -124,46 +123,173 @@ void Parser::vars_and_const() {
     }
 }
 
-void Parser::expression() {
-
+int Parser::faktor() {
+    switch (cur_tok) {
+        case tok_identifier:
+            cur_tok = getNextToken();
+            return var[m_Lexer.identifierStr()].int_val;
+        case tok_integer:
+            cur_tok = getNextToken();
+            return m_Lexer.numVal();
+        case tok_opbrak: {
+            cur_tok = getNextToken();
+            int a;
+            a = expression();
+            match(tok_clbrak);
+            cur_tok = getNextToken();
+            return a;
+        }
+        case tok_minus: {
+            cur_tok = getNextToken();
+            int a;
+            a = faktor();
+            return -a;
+        }
+        default:
+            throw "not match " + cur_tok;
+    }
 }
 
-void Parser::command() {
+int Parser::term_prime(int a) {
+    switch (cur_tok) {
+        case tok_mul: {
+            cur_tok = getNextToken();
+            int b, c;
+            b = faktor();
+            c = term_prime(a * b);
+            return c;
+        }
+        case tok_div: {
+            cur_tok = getNextToken();
+            int b, c;
+            b = faktor();
+            c = term_prime(a / b);
+            return c;
+        }
+        default:
+            return a;
+    }
+}
+
+int Parser::term() {
+    int a, b;
+    a = faktor();
+    b = term_prime(a);
+    return b;
+}
+
+int Parser::expression_prime(int a) {
+    switch (cur_tok) {
+        case tok_plus: {
+            cur_tok = getNextToken();
+            int b, c;
+            b = term();
+            c = expression_prime(a + b);
+            return c;
+        }
+        case tok_minus: {
+            cur_tok = getNextToken();
+            int b, c;
+            b = term();
+            c = expression_prime(a - b);
+            return c;
+        }
+        default:
+            return a;
+    }
+}
+
+int Parser::expression() {
+    int a, b;
+    a = term();
+    b = expression_prime(a);
+    return b;
+}
+
+void Parser::writeln() {
+    match(tok_opbrak);
+    cur_tok = getNextToken();
+    expression();
+    match(tok_clbrak);
+    cur_tok = getNextToken();
+}
+
+void Parser::readln() {
+    match(tok_opbrak);
+    cur_tok = getNextToken();
+    match(tok_identifier);
+    //TODO input
+    cur_tok = getNextToken();
+    match(tok_clbrak);
+    cur_tok = getNextToken();
+}
+
+ComandAST *Parser::command() {
     switch (cur_tok) {
         case tok_identifier: {
             std::string name = m_Lexer.identifierStr();
+            VarAST var(name);
             cur_tok = getNextToken();
             match(tok_assign);
             cur_tok = getNextToken();
             expression();
-            return;
+            AssignAST *assign;
+            assign->var = var.clone();
+            return assign->clone();
         }
-        case tok_if:
-            //TODO if
-            return;
+        case tok_writeln:
+            cur_tok = getNextToken();
+            writeln();
+            WritelnAST *write;
+            return write;
+        case tok_readln:
+            cur_tok = getNextToken();
+            readln();
+            ReadAST *read;
+            return read;
     }
 }
 
 void Parser::rest_command() {
-
+    switch (cur_tok) {
+        case tok_semicolon:
+            cur_tok = getNextToken();
+            command();
+            rest_command();
+            return;
+        default:
+            return;
+    }
 }
 
-void Parser::body() {
+Prog *Parser::body() {
+    Prog *main;
     match(tok_begin);
     cur_tok = getNextToken();
-    command();
-    rest_command();
+    main->commands.push_back(command());
+    while (cur_tok == tok_semicolon) {
+        cur_tok = getNextToken();
+        main->commands.push_back(command());
+    }
     match(tok_end);
+    return main->clone();
+
 }
 
 
-bool Parser::Parse() {
+Module *Parser::Parse() {
     cur_tok = getNextToken();
     start_of_prog();
     vars_and_const();
+    Vars vars_and_const(var);
     //TODO func
-    body();
-    return true;
+    Prog *main;
+    main = body();
+
+    Module *module;
+    module->vars = vars_and_const.clone();
+    module->main = main;
+    return module;
 }
 
 void Parser::InitLexan(char *name_of_file) {

@@ -15,6 +15,7 @@
 #include <llvm/IR/Verifier.h>
 
 #include "Lexer.hpp"
+#include "AST.h"
 
 class Parser {
 public:
@@ -22,7 +23,7 @@ public:
 
     ~Parser() = default;
 
-    bool Parse();                    // parse
+    Module *Parse();                    // parse
     const llvm::Module &Generate();  // generate
 
     void InitLexan(char *name_of_file);
@@ -35,6 +36,10 @@ private:
 
     void start_of_prog();
 
+    void writeln();
+
+    void readln();
+
     void vars();
 
     void vars_rest();
@@ -45,28 +50,28 @@ private:
 
     void vars_and_const();
 
-    void body();
+    Prog *body();
 
-    void command();
+    ComandAST* command();
 
     void rest_command();
 
-    void expression();
+    int expression();
+
+    int term();
+
+    int expression_prime(int a);
+
+    int term_prime(int a);
+
+    int faktor();
 
     Lexer m_Lexer;                   // lexer is used to read tokens
     Token cur_tok;                      // to keep the current token
 
 
 
-    struct Variable {
-        enum Type {
-            integer, float_number
-        };
-        Type type;
-        int int_val;
-        float float_val;
-        bool if_const;
-    };
+
 
     //name of prog
     std::string name_of_prog;

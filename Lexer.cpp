@@ -31,6 +31,7 @@ const struct {
         {"program", tok_program},
         {"end",     tok_end},
         {"var",     tok_var},
+        {"const",     tok_const},
         {"integer", tok_integer},
         {"div",     tok_div},
         {"mod",     tok_mod},
@@ -64,7 +65,7 @@ Token Lexer::readNumber() {
         cur_symb = readSymbol();
     }
     m_NumVal = sum;
-    return tok_number;
+    return tok_integer;
 }
 
 Token Lexer::readSpe() {
@@ -127,7 +128,6 @@ Token Lexer::readSpe() {
 }
 
 Token Lexer::gettok() {
-    std::cout << cur_symb << std::endl;
     if (type_of_char() == LETTER) {
         return readString();
     }
