@@ -197,10 +197,18 @@ public:
 };
 
 class ReadAST : public ComandAST {
+public:
+    ReadAST *clone() const override {
+        return new ReadAST(*this);
+    }
 
     void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
-
+        MilaBuilder.CreateCall(MilaModule.getFunction("readln"), {
+                NamedValues[var->name]
+        });
     }
+
+    VarAST *var;
 };
 
 class Prog {

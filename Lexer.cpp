@@ -31,7 +31,7 @@ const struct {
         {"program", tok_program},
         {"end",     tok_end},
         {"var",     tok_var},
-        {"const",     tok_const},
+        {"const",   tok_const},
         {"integer", tok_integer},
         {"div",     tok_div},
         {"mod",     tok_mod},
@@ -69,9 +69,10 @@ Token Lexer::readNumber() {
 }
 
 Token Lexer::readSpe() {
-    switch (cur_symb) {
+    char symb = cur_symb;
+    cur_symb = readSymbol();
+    switch (symb) {
         case ':':
-            cur_symb = readSymbol();
             if (type_of_char() == SPE_SYMB && cur_symb == '=') {
                 cur_symb = readSymbol();
                 return tok_assign;
@@ -79,22 +80,16 @@ Token Lexer::readSpe() {
             return tok_colon;
 
         case ';':
-            cur_symb = readSymbol();
             return tok_semicolon;
         case '+':
-            cur_symb = readSymbol();
             return tok_plus;
         case '-':
-            cur_symb = readSymbol();
             return tok_minus;
         case '*':
-            cur_symb = readSymbol();
             return tok_mul;
         case '.':
-            cur_symb = readSymbol();
             return tok_dot;
         case '<':
-            cur_symb = readSymbol();
             if (type_of_char() == SPE_SYMB && cur_symb == '>') {
                 cur_symb = readSymbol();
                 return tok_notequal;
@@ -105,25 +100,19 @@ Token Lexer::readSpe() {
             }
             return tok_lessequal;
         case '=':
-            cur_symb = readSymbol();
             return tok_equal;
         case '>':
-            cur_symb = readSymbol();
             if (type_of_char() == SPE_SYMB && cur_symb == '=') {
                 cur_symb = readSymbol();
                 return tok_greaterequal;
             }
             return tok_greater;
         case ',':
-            cur_symb = readSymbol();
             return tok_comma;
         case '(':
-            cur_symb = readSymbol();
             return tok_opbrak;
         case ')':
-            cur_symb = readSymbol();
             return tok_clbrak;
-
     }
 }
 
@@ -147,10 +136,9 @@ Token Lexer::gettok() {
 }
 
 void Lexer::InitInput(char *name) {
-    if (!name)
-        int a;
-    else {
+    if (name) {
         file.open(name);
+        open = true;
     }
     cur_symb = readSymbol();
 }
@@ -158,8 +146,11 @@ void Lexer::InitInput(char *name) {
 int Lexer::readSymbol() {
     char c;
     if (!file.eof()) {
-        file >> std::noskipws >> c;
-        //std::cout << c << std::endl;
+        if (open) {
+            file >> std::noskipws >> c;
+        } else {
+            std::cin >> std::noskipws >> c;
+        }
         return c;
     } else
         return 0;

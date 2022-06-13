@@ -117,6 +117,7 @@ public:
 
 private:
     std::ifstream file;
+    bool open = false;
 
     int cur_symb = -1;
 

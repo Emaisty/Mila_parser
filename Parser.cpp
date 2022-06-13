@@ -235,14 +235,16 @@ ExpAST *Parser::writeln() {
     return a;
 }
 
-void Parser::readln() {
+VarAST *Parser::readln() {
     match(tok_opbrak);
     cur_tok = getNextToken();
     match(tok_identifier);
-    //TODO input
+    VarAST var;
+    var.name = m_Lexer.identifierStr();
     cur_tok = getNextToken();
     match(tok_clbrak);
     cur_tok = getNextToken();
+    return var.clone();
 }
 
 ComandAST *Parser::command() {
@@ -264,11 +266,12 @@ ComandAST *Parser::command() {
             write.exp = writeln();
             return write.clone();
         }
-        case tok_readln:
+        case tok_readln: {
             cur_tok = getNextToken();
-            readln();
-            ReadAST *read;
-            return read;
+            ReadAST read;
+            read.var = readln();
+            return read.clone();
+        }
     }
 }
 
@@ -332,6 +335,24 @@ const llvm::Module &Parser::Generate() {
             Arg.setName("x");
     }
 
+    // create write function
+    {
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
+        llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "write", MilaModule);
+        for (auto &Arg: F->args())
+            Arg.setName("x");
+    }
+
+    //create readln function
+    {
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32PtrTy(MilaContext));
+        llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32PtrTy(MilaContext), Ints, false);
+        llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "readln", MilaModule);
+        for (auto &Arg: F->args())
+            Arg.setName("x");
+    }
+
     // create main function
     {
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), false);
@@ -341,6 +362,7 @@ const llvm::Module &Parser::Generate() {
         llvm::BasicBlock *BB = llvm::BasicBlock::Create(MilaContext, "entry", MainFunction);
         MilaBuilder.SetInsertPoint(BB);
 
+        // declare variables
         for (auto i = program->vars->vars_and_const.begin(); i != program->vars->vars_and_const.end(); ++i) {
             AllocaInst *Alloca = CreateEntryBlockAlloca(MainFunction, i->first, MilaContext);
             Value *StartVal = ConstantInt::get(MilaContext, APInt(32, i->second.int_val));

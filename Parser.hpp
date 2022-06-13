@@ -36,9 +36,11 @@ private:
 
     void start_of_prog();
 
-    ExpAST* writeln();
+    ExpAST *writeln();
 
-    void readln();
+    ExpAST *write();
+
+    VarAST *readln();
 
     void vars();
 
@@ -70,7 +72,6 @@ private:
     Token cur_tok;                      // to keep the current token
 
     Module_prog *program;
-
 
 
     //name of prog
