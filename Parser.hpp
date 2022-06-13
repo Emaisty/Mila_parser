@@ -23,7 +23,7 @@ public:
 
     ~Parser() = default;
 
-    Module *Parse();                    // parse
+    Module_prog *Parse();                    // parse
     const llvm::Module &Generate();  // generate
 
     void InitLexan(char *name_of_file);
@@ -36,7 +36,7 @@ private:
 
     void start_of_prog();
 
-    void writeln();
+    ExpAST* writeln();
 
     void readln();
 
@@ -52,24 +52,24 @@ private:
 
     Prog *body();
 
-    ComandAST* command();
+    ComandAST *command();
 
     void rest_command();
 
-    int expression();
+    ExpAST *expression();
 
-    int term();
+    ExpAST *term();
 
-    int expression_prime(int a);
+    ExpAST *expression_prime(ExpAST *a);
 
-    int term_prime(int a);
+    ExpAST *term_prime(ExpAST *a);
 
-    int faktor();
+    ExpAST *faktor();
 
     Lexer m_Lexer;                   // lexer is used to read tokens
     Token cur_tok;                      // to keep the current token
 
-
+    Module_prog *program;
 
 
 

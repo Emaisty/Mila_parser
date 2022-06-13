@@ -123,95 +123,116 @@ void Parser::vars_and_const() {
     }
 }
 
-int Parser::faktor() {
+ExpAST *Parser::faktor() {
     switch (cur_tok) {
-        case tok_identifier:
+        case tok_identifier: {
+            VarAST var;
+            var.name = m_Lexer.identifierStr();
             cur_tok = getNextToken();
-            return var[m_Lexer.identifierStr()].int_val;
-        case tok_integer:
+            return var.clone();
+        }
+        case tok_integer: {
+            IntAST integer;
+            integer.value = m_Lexer.numVal();
             cur_tok = getNextToken();
-            return m_Lexer.numVal();
+            return integer.clone();
+        }
         case tok_opbrak: {
             cur_tok = getNextToken();
-            int a;
-            a = expression();
+            BranchAST branch;
+            branch.exp = expression();
             match(tok_clbrak);
             cur_tok = getNextToken();
-            return a;
+            return branch.clone();
         }
         case tok_minus: {
             cur_tok = getNextToken();
-            int a;
-            a = faktor();
-            return -a;
+            UnaroperAST unar;
+            unar.exp = faktor();
+            unar.op = '-';
+            return unar.clone();
         }
         default:
             throw "not match " + cur_tok;
     }
 }
 
-int Parser::term_prime(int a) {
+ExpAST *Parser::term_prime(ExpAST *a) {
     switch (cur_tok) {
         case tok_mul: {
             cur_tok = getNextToken();
-            int b, c;
-            b = faktor();
-            c = term_prime(a * b);
-            return c;
+            BinoperAST mul_exp;
+            ExpAST *mul_res;
+            mul_exp.op = '*';
+            mul_exp.left = a;
+            mul_exp.right = faktor();
+            mul_res = term_prime(mul_exp.clone());
+            return mul_res;
         }
         case tok_div: {
             cur_tok = getNextToken();
-            int b, c;
-            b = faktor();
-            c = term_prime(a / b);
-            return c;
+            BinoperAST div_exp;
+            ExpAST *div_res;
+            div_exp.op = '/';
+            div_exp.left = a;
+            div_exp.right = faktor();
+            div_res = term_prime(div_exp.clone());
+            return div_res;
         }
         default:
             return a;
     }
 }
 
-int Parser::term() {
-    int a, b;
+ExpAST *Parser::term() {
+    ExpAST *a, *b;
     a = faktor();
     b = term_prime(a);
     return b;
 }
 
-int Parser::expression_prime(int a) {
+ExpAST *Parser::expression_prime(ExpAST *a) {
     switch (cur_tok) {
         case tok_plus: {
             cur_tok = getNextToken();
-            int b, c;
-            b = term();
-            c = expression_prime(a + b);
-            return c;
+            BinoperAST plus_exp;
+            ExpAST *plus_res;
+            plus_exp.op = '+';
+            plus_exp.left = a;
+            plus_exp.right = term();
+            plus_res = expression_prime(plus_exp.clone());
+            return plus_res;
         }
         case tok_minus: {
             cur_tok = getNextToken();
-            int b, c;
-            b = term();
-            c = expression_prime(a - b);
-            return c;
+            BinoperAST minus_exp;
+            ExpAST *minus_res;
+            minus_exp.op = '-';
+            minus_exp.left = a;
+            minus_exp.right = term();
+            minus_res = expression_prime(minus_exp.clone());
+            return minus_res;
         }
         default:
             return a;
     }
 }
 
-int Parser::expression() {
-    int a, b;
+ExpAST *Parser::expression() {
+    ExpAST *a, *b;
     a = term();
     b = expression_prime(a);
     return b;
 }
 
-void Parser::writeln() {
+ExpAST *Parser::writeln() {
     match(tok_opbrak);
     cur_tok = getNextToken();
-    expression();
+    ExpAST *a;
+    a = expression();
     match(tok_clbrak);
     cur_tok = getNextToken();
+    return a;
 }
 
 void Parser::readln() {
@@ -232,16 +253,17 @@ ComandAST *Parser::command() {
             cur_tok = getNextToken();
             match(tok_assign);
             cur_tok = getNextToken();
-            expression();
-            AssignAST *assign;
-            assign->var = var.clone();
-            return assign->clone();
+            AssignAST assign;
+            assign.var = var.clone();
+            assign.exp = expression();
+            return assign.clone();
         }
-        case tok_writeln:
+        case tok_writeln: {
             cur_tok = getNextToken();
-            writeln();
-            WritelnAST *write;
-            return write;
+            WritelnAST write;
+            write.exp = writeln();
+            return write.clone();
+        }
         case tok_readln:
             cur_tok = getNextToken();
             readln();
@@ -263,21 +285,23 @@ void Parser::rest_command() {
 }
 
 Prog *Parser::body() {
-    Prog *main;
+    Prog main;
     match(tok_begin);
     cur_tok = getNextToken();
-    main->commands.push_back(command());
+    main.commands.push_back(command());
     while (cur_tok == tok_semicolon) {
         cur_tok = getNextToken();
-        main->commands.push_back(command());
+        ComandAST *lol = command();
+        main.commands.push_back(lol);
     }
+
     match(tok_end);
-    return main->clone();
+    return main.clone();
 
 }
 
 
-Module *Parser::Parse() {
+Module_prog *Parser::Parse() {
     cur_tok = getNextToken();
     start_of_prog();
     vars_and_const();
@@ -286,10 +310,11 @@ Module *Parser::Parse() {
     Prog *main;
     main = body();
 
-    Module *module;
-    module->vars = vars_and_const.clone();
-    module->main = main;
-    return module;
+    Module_prog module;
+    module.vars = vars_and_const.clone();
+    module.main = main;
+    program = module.clone();
+    return program;
 }
 
 void Parser::InitLexan(char *name_of_file) {
@@ -316,10 +341,22 @@ const llvm::Module &Parser::Generate() {
         llvm::BasicBlock *BB = llvm::BasicBlock::Create(MilaContext, "entry", MainFunction);
         MilaBuilder.SetInsertPoint(BB);
 
+        for (auto i = program->vars->vars_and_const.begin(); i != program->vars->vars_and_const.end(); ++i) {
+            AllocaInst *Alloca = CreateEntryBlockAlloca(MainFunction, i->first, MilaContext);
+            Value *StartVal = ConstantInt::get(MilaContext, APInt(32, i->second.int_val));
+            MilaBuilder.CreateStore(StartVal, Alloca);
+            NamedValues[i->first] = Alloca;
+        }
+
+
+
+        /*
         // call writeln with value from lexel
         MilaBuilder.CreateCall(MilaModule.getFunction("writeln"), {
                 llvm::ConstantInt::get(MilaContext, llvm::APInt(32, 0))
-        });
+        });*/
+
+        program->codegen(MilaContext, MilaBuilder, MilaModule);
 
         // return 0
         MilaBuilder.CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(MilaContext), 0));

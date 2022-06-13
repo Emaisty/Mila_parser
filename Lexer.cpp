@@ -159,7 +159,7 @@ int Lexer::readSymbol() {
     char c;
     if (!file.eof()) {
         file >> std::noskipws >> c;
-        std::cout << c << std::endl;
+        //std::cout << c << std::endl;
         return c;
     } else
         return 0;
