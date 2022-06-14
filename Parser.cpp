@@ -415,7 +415,6 @@ ComandAST *Parser::command() {
             match(tok_then);
             cur_tok = getNextToken();
             stat.if_st = command();
-            std::cout << cur_tok << std::endl;
             if (cur_tok == tok_else) {
                 cur_tok = getNextToken();
                 stat.else_st = command();
@@ -429,13 +428,8 @@ ComandAST *Parser::command() {
             ComandAST *cmd;
             cmd = command();
             block.commands.push_back(cmd);
-            match(tok_semicolon);
-            cur_tok = getNextToken();
-            while (cmd = command()) {
-                match(tok_semicolon);
-                cur_tok = getNextToken();
+            while (cmd = command())
                 block.commands.push_back(cmd);
-            }
             match(tok_end);
             cur_tok = getNextToken();
             match(tok_semicolon);
@@ -497,7 +491,7 @@ const llvm::Module &Parser::Generate() {
 
     // create writeln function
     {
-        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writeln", MilaModule);
         for (auto &Arg: F->args())
@@ -506,7 +500,7 @@ const llvm::Module &Parser::Generate() {
 
     // create write function
     {
-        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "write", MilaModule);
         for (auto &Arg: F->args())
@@ -514,7 +508,7 @@ const llvm::Module &Parser::Generate() {
     }
     //create readln function
     {
-        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32PtrTy(MilaContext));
+        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32PtrTy(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32PtrTy(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "readln", MilaModule);
         for (auto &Arg: F->args())
