@@ -140,7 +140,7 @@ ExpAST *Parser::faktor() {
         case tok_opbrak: {
             cur_tok = getNextToken();
             BranchAST branch;
-            branch.exp = expression();
+            branch.exp = full_expression();
             match(tok_clbrak);
             cur_tok = getNextToken();
             return branch.clone();
@@ -153,6 +153,7 @@ ExpAST *Parser::faktor() {
             return unar.clone();
         }
         default:
+            std::cout << "unknown command\n";
             throw "not match " + cur_tok;
     }
 }
@@ -225,6 +226,136 @@ ExpAST *Parser::expression() {
     return b;
 }
 
+ExpAST *Parser::full_faktor() {
+    switch (cur_tok) {
+        case tok_not: {
+            cur_tok = getNextToken();
+            UnaroperAST op;
+            op.op = '!';
+            op.exp = full_faktor();
+            return op.clone();
+        }
+        default: {
+            ExpAST *res;
+            res = expression();
+            return res;
+        }
+    }
+}
+
+ExpAST *Parser::full_term_prime(ExpAST *a) {
+    switch (cur_tok) {
+        case tok_and: {
+            cur_tok = getNextToken();
+            BinoperAST op;
+            ExpAST *res;
+            op.op = '&';
+            op.left = a;
+            op.right = full_faktor();
+            res = full_term_prime(op.clone());
+            return res;
+        }
+        case tok_or: {
+            cur_tok = getNextToken();
+            BinoperAST op;
+            ExpAST *res;
+            op.op = '|';
+            op.left = a;
+            op.right = full_faktor();
+            res = full_term_prime(op.clone());
+            return res;
+        }
+        default:
+            return a;
+    }
+}
+
+ExpAST *Parser::full_term() {
+    ExpAST *a, *b;
+    a = full_faktor();
+    b = full_term_prime(a);
+    return b;
+}
+
+ExpAST *Parser::full_expression_prime(ExpAST *a) {
+    switch (cur_tok) {
+        case tok_greater: {
+            cur_tok = getNextToken();
+            BinoperAST gtop;
+            ExpAST *res;
+            gtop.op = '>';
+            gtop.adop = '!';
+            gtop.left = a;
+            gtop.right = full_term();
+            res = full_expression_prime(gtop.clone());
+            return res;
+        }
+        case tok_greaterequal: {
+            cur_tok = getNextToken();
+            BinoperAST gtop;
+            ExpAST *res;
+            gtop.op = '>';
+            gtop.adop = '=';
+            gtop.left = a;
+            gtop.right = full_term();
+            res = full_expression_prime(gtop.clone());
+            return res;
+        }
+        case tok_less: {
+            cur_tok = getNextToken();
+            BinoperAST gtop;
+            ExpAST *res;
+            gtop.op = '<';
+            gtop.adop = '!';
+            gtop.left = a;
+            gtop.right = full_term();
+            res = full_expression_prime(gtop.clone());
+            return res;
+        }
+        case tok_lessequal: {
+            cur_tok = getNextToken();
+            BinoperAST gtop;
+            ExpAST *res;
+            gtop.op = '<';
+            gtop.adop = '=';
+            gtop.left = a;
+            gtop.right = full_term();
+            res = full_expression_prime(gtop.clone());
+            return res;
+        }
+        case tok_equal: {
+            cur_tok = getNextToken();
+            BinoperAST gtop;
+            ExpAST *res;
+            gtop.op = '=';
+            gtop.left = a;
+            gtop.right = full_term();
+            res = full_expression_prime(gtop.clone());
+            return res;
+        }
+        case tok_notequal: {
+            cur_tok = getNextToken();
+            BinoperAST gtop;
+            ExpAST *res;
+            gtop.op = '!';
+            gtop.left = a;
+            gtop.right = full_term();
+            res = full_expression_prime(gtop.clone());
+            return res;
+        }
+        default:
+            return a;
+    }
+}
+
+ExpAST *Parser::full_expression() {
+    ExpAST *a, *b;
+    a = full_term();
+    b = full_expression_prime(a);
+    return b;
+}
+
+
 ExpAST *Parser::writeln() {
     match(tok_opbrak);
     cur_tok = getNextToken();
@@ -257,21 +388,62 @@ ComandAST *Parser::command() {
             cur_tok = getNextToken();
             AssignAST assign;
             assign.var = var.clone();
-            assign.exp = expression();
+            assign.exp = full_expression();
+            match(tok_semicolon);
             return assign.clone();
         }
         case tok_writeln: {
             cur_tok = getNextToken();
             WritelnAST write;
             write.exp = writeln();
+            match(tok_semicolon);
+            cur_tok = getNextToken();
             return write.clone();
         }
         case tok_readln: {
             cur_tok = getNextToken();
             ReadAST read;
             read.var = readln();
+            match(tok_semicolon);
+            cur_tok = getNextToken();
             return read.clone();
         }
+        case tok_if: {
+            cur_tok = getNextToken();
+            IfAST stat;
+            stat.exp = full_expression();
+            match(tok_then);
+            cur_tok = getNextToken();
+            stat.if_st = command();
+            std::cout << cur_tok << std::endl;
+            if (cur_tok == tok_else) {
+                cur_tok = getNextToken();
+                stat.else_st = command();
+            } else
+                stat.else_st = nullptr;
+            return stat.clone();
+        }
+        case tok_begin: {
+            cur_tok = getNextToken();
+            BlockAST block;
+            ComandAST *cmd;
+            cmd = command();
+            block.commands.push_back(cmd);
+            match(tok_semicolon);
+            cur_tok = getNextToken();
+            while (cmd = command()) {
+                match(tok_semicolon);
+                cur_tok = getNextToken();
+                block.commands.push_back(cmd);
+            }
+            match(tok_end);
+            cur_tok = getNextToken();
+            match(tok_semicolon);
+            cur_tok = getNextToken();
+            return block.clone();
+        }
+        default:
+            return nullptr;
     }
 }
 
@@ -291,13 +463,10 @@ Prog *Parser::body() {
     Prog main;
     match(tok_begin);
     cur_tok = getNextToken();
-    main.commands.push_back(command());
-    while (cur_tok == tok_semicolon) {
-        cur_tok = getNextToken();
-        ComandAST *lol = command();
-        main.commands.push_back(lol);
-    }
-
+    ComandAST *cmd = command();
+    main.commands.push_back(cmd);
+    while (cmd = command())
+        main.commands.push_back(cmd);
     match(tok_end);
     return main.clone();
 
@@ -343,7 +512,6 @@ const llvm::Module &Parser::Generate() {
         for (auto &Arg: F->args())
             Arg.setName("x");
     }
-
     //create readln function
     {
         std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32PtrTy(MilaContext));

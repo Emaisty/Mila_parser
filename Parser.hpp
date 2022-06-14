@@ -58,6 +58,16 @@ private:
 
     void rest_command();
 
+    ExpAST *full_expression();
+
+    ExpAST *full_expression_prime(ExpAST* a);
+
+    ExpAST *full_term();
+
+    ExpAST *full_term_prime(ExpAST* a);
+
+    ExpAST *full_faktor();
+
     ExpAST *expression();
 
     ExpAST *term();

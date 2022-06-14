@@ -87,8 +87,10 @@ public:
 
     Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
         AllocaInst *A = NamedValues[name];
-        if (!A)
+        if (!A) {
+            std::cout << "not known value\n";
             throw "Error";
+        }
         return MilaBuilder.CreateLoad(A->getAllocatedType(), A, name.c_str());
     }
 
@@ -97,7 +99,7 @@ public:
 
 class BinoperAST : public ExpAST {
 public:
-    char op;
+    char op, adop;
     ExpAST *left;
     ExpAST *right;
 
@@ -108,6 +110,7 @@ public:
     Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
         Value *L = left->codegen(MilaContext, MilaBuilder, MilaModule);
         Value *R = right->codegen(MilaContext, MilaBuilder, MilaModule);
+
         if (!L || !R)
             return nullptr;
         switch (op) {
@@ -119,6 +122,37 @@ public:
                 return MilaBuilder.CreateMul(L, R, "multmp");
             case '/':
                 return MilaBuilder.CreateFDiv(L, R, "divtmp");
+            case '&':
+                L = MilaBuilder.CreateAnd(L, R, "andtmp");
+                return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+            case '|':
+                L = MilaBuilder.CreateOr(L, R, "ortmp");
+                return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+            case '>':
+                switch (adop) {
+                    case '=':
+                        L = MilaBuilder.CreateICmpSGE(L, R, "getmp");
+                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                    default:
+                        L = MilaBuilder.CreateICmpSGT(L, R, "gttmp");
+                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                }
+            case '<':
+                switch (adop) {
+                    case '=':
+                        L = MilaBuilder.CreateICmpSLE(L, R, "letmp");
+                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                    default:
+                        L = MilaBuilder.CreateICmpSLT(L, R, "lttmp");
+                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                }
+            case '=':
+                L = MilaBuilder.CreateICmpEQ(L, R, "eqtmp");
+                return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+            case '!':
+                L = MilaBuilder.CreateICmpNE(L, R, "netmp");
+                return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+
         }
     }
 };
@@ -161,6 +195,21 @@ public:
     virtual void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) = 0;
 };
 
+class BlockAST : public ComandAST {
+public:
+    BlockAST *clone() const override {
+        return new BlockAST(*this);
+    }
+
+    void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
+        for (auto &i: commands) {
+            i->codegen(MilaContext, MilaBuilder, MilaModule);
+        }
+    }
+
+    std::vector<ComandAST *> commands;
+};
+
 //assign operator
 class AssignAST : public ComandAST {
 public:
@@ -178,6 +227,54 @@ public:
 
     VarAST *var;
     ExpAST *exp;
+};
+
+class IfAST : public ComandAST {
+public:
+    IfAST *clone() const override {
+        return new IfAST(*this);
+    }
+
+    void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
+        Value *Val = exp->codegen(MilaContext, MilaBuilder, MilaModule);
+        Val = MilaBuilder.CreateICmpNE(Val, ConstantInt::get(MilaContext, APInt(32, 0)), "ifcond");
+
+        Function *TheFunction = MilaBuilder.GetInsertBlock()->getParent();
+
+        BasicBlock *ThenBB = BasicBlock::Create(MilaContext, "then", TheFunction);
+        BasicBlock *ElseBB = BasicBlock::Create(MilaContext, "else");
+        BasicBlock *MergeBB = BasicBlock::Create(MilaContext, "ifcont");
+        MilaBuilder.CreateCondBr(Val, ThenBB, ElseBB);
+
+        MilaBuilder.SetInsertPoint(ThenBB);
+
+        if_st->codegen(MilaContext, MilaBuilder, MilaModule);
+
+        MilaBuilder.CreateBr(MergeBB);
+        // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
+        ThenBB = MilaBuilder.GetInsertBlock();
+
+        // Emit else block.
+        if (else_st) {
+            TheFunction->getBasicBlockList().push_back(ElseBB);
+            MilaBuilder.SetInsertPoint(ElseBB);
+            else_st->codegen(MilaContext, MilaBuilder, MilaModule);
+
+
+            MilaBuilder.CreateBr(MergeBB);
+        }
+        // Codegen of 'Else' can change the current block, update ElseBB for the PHI.
+        ElseBB = MilaBuilder.GetInsertBlock();
+
+        // Emit merge block.
+        TheFunction->getBasicBlockList().push_back(MergeBB);
+        MilaBuilder.SetInsertPoint(MergeBB);
+
+
+    }
+
+    ExpAST *exp;
+    ComandAST *if_st, *else_st;
 };
 
 class WritelnAST : public ComandAST {

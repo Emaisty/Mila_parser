@@ -36,7 +36,11 @@ const struct {
         {"div",     tok_div},
         {"mod",     tok_mod},
         {"readln",  tok_readln},
-        {"writeln", tok_writeln}
+        {"write",   tok_write},
+        {"writeln", tok_writeln},
+        {"if",      tok_if},
+        {"then",    tok_then},
+        {"else",    tok_else}
 };
 
 
@@ -107,6 +111,20 @@ Token Lexer::readSpe() {
                 return tok_greaterequal;
             }
             return tok_greater;
+        case '|':
+            if (type_of_char() == SPE_SYMB && cur_symb == '|') {
+                cur_symb = readSymbol();
+                return tok_or;
+            }
+            throw "ERROR. Unknown operator.";
+        case '&':
+            if (type_of_char() == SPE_SYMB && cur_symb == '&') {
+                cur_symb = readSymbol();
+                return tok_and;
+            }
+            throw "ERROR. Unknown operator.";
+        case '!':
+            return tok_not;
         case ',':
             return tok_comma;
         case '(':
