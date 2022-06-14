@@ -112,7 +112,11 @@ public:
 
     Token readString();
 
-    Token readNumber();
+    Token readNumber_dec();
+
+    Token readNumber_oct();
+
+    Token readNumber_hex();
 
     Token readSpe();
 

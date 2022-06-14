@@ -14,7 +14,8 @@ InputCharType Lexer::type_of_char() {
         return NUMBER;
     else if (cur_symb == EOF || cur_symb == 0)
         return END;
-    else if ((cur_symb >= ':' && cur_symb <= '?') || (cur_symb >= '(' && cur_symb <= '-'))
+    else if ((cur_symb >= ':' && cur_symb <= '?') || (cur_symb >= '(' && cur_symb <= '-') || cur_symb == '$' ||
+             cur_symb == '&')
         return SPE_SYMB;
     else if (cur_symb <= ' ')
         return WHITE_SPACE;
@@ -61,12 +62,50 @@ Token Lexer::readString() {
 
 }
 
-Token Lexer::readNumber() {
+Token Lexer::readNumber_dec() {
     int sum = 0;
     while (type_of_char() == NUMBER) {
         sum *= 10;
         sum += cur_symb - 48;
         cur_symb = readSymbol();
+    }
+    m_NumVal = sum;
+    return tok_integer;
+}
+
+Token Lexer::readNumber_oct() {
+    std::string num;
+    int sum = 0, base = 1;
+    while (type_of_char() == NUMBER) {
+        if (cur_symb < '0' || cur_symb > '7')
+            throw "Error. Number not in oct form";
+        num += cur_symb;
+        cur_symb = readSymbol();
+    }
+    for (int i = num.size() - 1; i >= 0; --i) {
+        sum += (num[i] - 48) * base;
+        base *= 8;
+    }
+    m_NumVal = sum;
+    return tok_integer;
+}
+
+Token Lexer::readNumber_hex() {
+    std::string num;
+    int sum = 0, base = 1;
+    while (type_of_char() == NUMBER || type_of_char() == LETTER) {
+        if (type_of_char() == LETTER && (cur_symb < 'a' || cur_symb > 'f'))
+            throw "Error. Number not in hex form";
+        num += cur_symb;
+        cur_symb = readSymbol();
+    }
+    for (int i = num.size() - 1; i >= 0; --i) {
+        if (num[i] >= '0' && num[i] <= '9')
+            sum += (num[i] - 48) * base;
+        else
+            sum += (num[i] - 87) * base;
+        base *= 16;
+
     }
     m_NumVal = sum;
     return tok_integer;
@@ -111,18 +150,21 @@ Token Lexer::readSpe() {
                 return tok_greaterequal;
             }
             return tok_greater;
-        case '|':
-            if (type_of_char() == SPE_SYMB && cur_symb == '|') {
-                cur_symb = readSymbol();
-                return tok_or;
-            }
-            throw "ERROR. Unknown operator.";
+            /*case '|':
+                if (type_of_char() == SPE_SYMB && cur_symb == '|') {
+                    cur_symb = readSymbol();
+                    return tok_or;
+                }
+                throw "ERROR. Unknown operator.";*/
         case '&':
-            if (type_of_char() == SPE_SYMB && cur_symb == '&') {
+            return readNumber_oct();
+            /*if (type_of_char() == SPE_SYMB && cur_symb == '&') {
                 cur_symb = readSymbol();
                 return tok_and;
-            }
-            throw "ERROR. Unknown operator.";
+            }*/
+        case '$':
+            std::cout << "lol\n";
+            return readNumber_hex();
         case '!':
             return tok_not;
         case ',':
@@ -131,6 +173,9 @@ Token Lexer::readSpe() {
             return tok_opbrak;
         case ')':
             return tok_clbrak;
+        default:
+            throw "Error. Unknown symbol";
+
     }
 }
 
@@ -139,7 +184,7 @@ Token Lexer::gettok() {
         return readString();
     }
     if (type_of_char() == NUMBER) {
-        return readNumber();
+        return readNumber_dec();
     }
     if (type_of_char() == END) {
         return tok_eof;

@@ -122,12 +122,13 @@ public:
                 return MilaBuilder.CreateMul(L, R, "multmp");
             case '/':
                 return MilaBuilder.CreateFDiv(L, R, "divtmp");
-            case '&':
-                L = MilaBuilder.CreateAnd(L, R, "andtmp");
+            /*case '&':
+                L = MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
+                return MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
                 return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
             case '|':
-                L = MilaBuilder.CreateOr(L, R, "ortmp");
-                return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                L = MilaBuilder.CreateLogicalOr(L, R, "ortmp");
+                return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);*/
             case '>':
                 switch (adop) {
                     case '=':
@@ -244,8 +245,10 @@ public:
         BasicBlock *ThenBB = BasicBlock::Create(MilaContext, "then", TheFunction);
         BasicBlock *ElseBB = BasicBlock::Create(MilaContext, "else");
         BasicBlock *MergeBB = BasicBlock::Create(MilaContext, "ifcont");
-        MilaBuilder.CreateCondBr(Val, ThenBB, ElseBB);
-
+        if (else_st)
+            MilaBuilder.CreateCondBr(Val, ThenBB, ElseBB);
+        else
+            MilaBuilder.CreateCondBr(Val, ThenBB, MergeBB);
         MilaBuilder.SetInsertPoint(ThenBB);
 
         if_st->codegen(MilaContext, MilaBuilder, MilaModule);

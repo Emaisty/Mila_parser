@@ -390,6 +390,7 @@ ComandAST *Parser::command() {
             assign.var = var.clone();
             assign.exp = full_expression();
             match(tok_semicolon);
+            cur_tok = getNextToken();
             return assign.clone();
         }
         case tok_writeln: {
@@ -531,14 +532,6 @@ const llvm::Module &Parser::Generate() {
             MilaBuilder.CreateStore(StartVal, Alloca);
             NamedValues[i->first] = Alloca;
         }
-
-
-
-        /*
-        // call writeln with value from lexel
-        MilaBuilder.CreateCall(MilaModule.getFunction("writeln"), {
-                llvm::ConstantInt::get(MilaContext, llvm::APInt(32, 0))
-        });*/
 
         program->codegen(MilaContext, MilaBuilder, MilaModule);
 
