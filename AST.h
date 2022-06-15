@@ -34,7 +34,7 @@ struct Variable {
     };
     Type type;
     int int_val;
-    float float_val;
+    double float_val;
     bool if_const;
 };
 
@@ -121,7 +121,9 @@ public:
             case '*':
                 return MilaBuilder.CreateMul(L, R, "multmp");
             case '/':
-                return MilaBuilder.CreateFDiv(L, R, "divtmp");
+                return MilaBuilder.CreateUDiv(L, R, "divtmp");
+            case 'm':
+                return MilaBuilder.CreateURem(L, R, "modtmp");
                 /*case '&':
                     L = MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
                     return MilaBuilder.CreateLogicalAnd(L, R, "andtmp");

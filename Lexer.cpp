@@ -134,6 +134,8 @@ Token Lexer::readSpe() {
             return tok_mul;
         case '.':
             return tok_dot;
+        case ',':
+            return tok_comma;
         case '<':
             if (type_of_char() == SPE_SYMB && cur_symb == '>') {
                 cur_symb = readSymbol();
@@ -165,12 +167,9 @@ Token Lexer::readSpe() {
                 return tok_and;
             }*/
         case '$':
-            std::cout << "lol\n";
             return readNumber_hex();
         case '!':
             return tok_not;
-        case ',':
-            return tok_comma;
         case '(':
             return tok_opbrak;
         case ')':

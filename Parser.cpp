@@ -20,90 +20,208 @@ void Parser::start_of_prog() {
     cur_tok = getNextToken();
 }
 
-void Parser::vars_rest() {
-    switch (cur_tok) {
-        case tok_comma:
-            cur_tok = getNextToken();
-            match(tok_identifier);
-            line_vars.push_back(m_Lexer.identifierStr());
-            cur_tok = getNextToken();
-            vars_rest();
-            return;
-        default:
-            return;
-    }
-}
-
 void Parser::vars() {
+    std::vector<std::string> names;
     match(tok_identifier);
-    line_vars.push_back(m_Lexer.identifierStr());
+    names.push_back(m_Lexer.identifierStr());
     cur_tok = getNextToken();
-    vars_rest();
-    //TODO if int or float
-    for (; 0 < line_vars.size();) {
-        if (var.find(line_vars[0]) != var.end()) {
-            throw line_vars[0] + " already exist";
-        }
-        Variable new_var;
-        new_var.int_val = 0;
-        new_var.if_const = false;
-        new_var.type = Variable::integer;
-        var.insert(std::make_pair(line_vars[0], new_var));
-        //llvm::AllocaInst()
-        line_vars.erase(line_vars.begin(), line_vars.begin() + 1);
+    while (cur_tok == tok_comma) {
+        cur_tok = getNextToken();
+        match(tok_identifier);
+        names.push_back(m_Lexer.identifierStr());
+        cur_tok = getNextToken();
     }
+    match(tok_colon);
+    cur_tok = getNextToken();
+    switch (cur_tok) {
+        case tok_integer:
+            for (int i = 0; i < names.size(); ++i) {
+                for (auto j = var.begin(); j != var.end(); ++j) {
+                    if (names[i] == j->first) {
+                        std::cout << "var already exist";
+                        throw "";
+                    }
+                }
+                Variable a;
+                a.type = Variable::integer;
+                a.int_val = 0;
+                a.if_const = false;
+                var.insert(std::make_pair(names[i], a));
+            }
+            names.clear();
+            break;
+        case tok_double:
+            break;
+        default:
+            std::cout << "Error. Unknown type of var";
+            throw "";
+    }
+    cur_tok = getNextToken();
     match(tok_semicolon);
     cur_tok = getNextToken();
-}
-
-void Parser::consts_rest() {
-    switch (cur_tok) {
-        case tok_comma: {
+    while (cur_tok == tok_identifier) {
+        match(tok_identifier);
+        names.push_back(m_Lexer.identifierStr());
+        cur_tok = getNextToken();
+        while (cur_tok == tok_comma) {
             cur_tok = getNextToken();
             match(tok_identifier);
-            std::string name;
-            name = m_Lexer.identifierStr();
-            if (var.find(name) != var.end())
-                throw name + " already exist";
+            names.push_back(m_Lexer.identifierStr());
             cur_tok = getNextToken();
-            match(tok_equal);
-            cur_tok = getNextToken();
-            //TODO if float
-            match(tok_integer);
-            Variable new_const;
-            new_const.int_val = m_Lexer.numVal();
-            new_const.if_const = true;
-            new_const.type = Variable::integer;
-            var.insert(std::make_pair(name, new_const));
-            cur_tok = getNextToken();
-            consts_rest();
-            return;
         }
-        default:
-            return;
+        match(tok_colon);
+        cur_tok = getNextToken();
+        switch (cur_tok) {
+            case tok_integer:
+                for (int i = 0; i < names.size(); ++i) {
+                    for (auto j = var.begin(); j != var.end(); ++j) {
+                        if (names[i] == j->first) {
+                            std::cout << "var already exist";
+                            throw "";
+                        }
+                    }
+                    Variable a;
+                    a.type = Variable::integer;
+                    a.int_val = 0;
+                    a.if_const = false;
+                    var.insert(std::make_pair(names[i], a));
+                }
+                names.clear();
+                break;
+            case tok_double:
+                //TODO
+                break;
+            default:
+                std::cout << "Error. Unknown type of var";
+                throw "";
+        }
+        cur_tok = getNextToken();
+        match(tok_semicolon);
+        cur_tok = getNextToken();
     }
 }
 
 void Parser::consts() {
-    match(tok_identifier);
     std::string name;
+    match(tok_identifier);
     name = m_Lexer.identifierStr();
-    if (var.find(name) != var.end())
-        throw name + " already exist";
     cur_tok = getNextToken();
     match(tok_equal);
     cur_tok = getNextToken();
-    //TODO if float
-    match(tok_integer);
-    Variable new_const;
-    new_const.int_val = m_Lexer.numVal();
-    new_const.if_const = true;
-    new_const.type = Variable::integer;
-    var.insert(std::make_pair(name, new_const));
+    switch (cur_tok) {
+        case tok_integer:
+            for (auto j = var.begin(); j != var.end(); ++j) {
+                if (name == j->first) {
+                    std::cout << "var already exist";
+                    throw "";
+                }
+            }
+            Variable a;
+            a.type = Variable::integer;
+            a.int_val = m_Lexer.numVal();
+            a.if_const = true;
+            var.insert(std::make_pair(name, a));
+            break;
+        case tok_double:
+            //TODO
+            break;
+        default:
+            std::cout << "Error.";
+            throw "";
+    }
     cur_tok = getNextToken();
-    consts_rest();
+    while (cur_tok == tok_comma) {
+        cur_tok = getNextToken();
+        match(tok_identifier);
+        name = m_Lexer.identifierStr();
+        cur_tok = getNextToken();
+        match(tok_equal);
+        cur_tok = getNextToken();
+        switch (cur_tok) {
+            case tok_integer:
+                for (auto j = var.begin(); j != var.end(); ++j) {
+                    if (name == j->first) {
+                        std::cout << "var already exist";
+                        throw "";
+                    }
+                }
+                Variable a;
+                a.type = Variable::integer;
+                a.int_val = m_Lexer.numVal();
+                a.if_const = true;
+                var.insert(std::make_pair(name, a));
+                break;
+            case tok_double:
+                //TODO
+                break;
+            default:
+                std::cout << "Error.";
+                throw "";
+        }
+        cur_tok = getNextToken();
+    }
     match(tok_semicolon);
     cur_tok = getNextToken();
+    while (cur_tok == tok_identifier) {
+        name = m_Lexer.identifierStr();
+        cur_tok = getNextToken();
+        match(tok_equal);
+        cur_tok = getNextToken();
+        switch (cur_tok) {
+            case tok_integer:
+                for (auto j = var.begin(); j != var.end(); ++j) {
+                    if (name == j->first) {
+                        std::cout << "var already exist";
+                        throw "";
+                    }
+                }
+                Variable a;
+                a.type = Variable::integer;
+                a.int_val = m_Lexer.numVal();
+                a.if_const = true;
+                var.insert(std::make_pair(name, a));
+                break;
+            case tok_double:
+                //TODO
+                break;
+            default:
+                std::cout << "Error.";
+                throw "";
+        }
+        cur_tok = getNextToken();
+        while (cur_tok == tok_comma) {
+            cur_tok = getNextToken();
+            match(tok_identifier);
+            name = m_Lexer.identifierStr();
+            cur_tok = getNextToken();
+            match(tok_equal);
+            cur_tok = getNextToken();
+            switch (cur_tok) {
+                case tok_integer:
+                    for (auto j = var.begin(); j != var.end(); ++j) {
+                        if (name == j->first) {
+                            std::cout << "var already exist";
+                            throw "";
+                        }
+                    }
+                    Variable a;
+                    a.type = Variable::integer;
+                    a.int_val = m_Lexer.numVal();
+                    a.if_const = true;
+                    var.insert(std::make_pair(name, a));
+                    break;
+                case tok_double:
+                    //TODO
+                    break;
+                default:
+                    std::cout << "Error.";
+                    throw "";
+            }
+            cur_tok = getNextToken();
+        }
+        match(tok_semicolon);
+        cur_tok = getNextToken();
+    }
 }
 
 void Parser::vars_and_const() {
@@ -179,6 +297,16 @@ ExpAST *Parser::term_prime(ExpAST *a) {
             div_exp.right = faktor();
             div_res = term_prime(div_exp.clone());
             return div_res;
+        }
+        case tok_mod: {
+            cur_tok = getNextToken();
+            BinoperAST mod_exp;
+            ExpAST *mod_res;
+            mod_exp.op = 'm';
+            mod_exp.left = a;
+            mod_exp.right = faktor();
+            mod_res = term_prime(mod_exp.clone());
+            return mod_res;
         }
         default:
             return a;

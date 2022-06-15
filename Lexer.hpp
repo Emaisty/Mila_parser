@@ -31,6 +31,7 @@ enum Token {
     tok_exit,
     tok_var,
     tok_integer, //16
+    tok_double,
     tok_for,
     tok_do,
 
@@ -52,7 +53,7 @@ enum Token {
     tok_mod,
     tok_div,
     tok_not,
-    tok_and, //30
+    tok_and, //31
     tok_xor,
 
     // keywords in for loop
@@ -70,7 +71,7 @@ enum Token {
     //math operators
     tok_plus,
     tok_minus,
-    tok_mul, // 39
+    tok_mul, // 40
 
     //wtf
     tok_dot,
@@ -104,6 +105,8 @@ public:
 
     int numVal() { return this->m_NumVal; }
 
+    double douVal() { return this->m_DouVal; }
+
     void InitInput(char *name);
 
     int readSymbol();
@@ -128,6 +131,7 @@ private:
 
     std::string m_IdentifierStr;
     int m_NumVal;
+    double m_DouVal;
 };
 
 #endif //PJPPROJECT_LEXER_HPP
