@@ -423,6 +423,15 @@ ComandAST *Parser::command() {
                 stat.else_st = nullptr;
             return stat.clone();
         }
+        case tok_while: {
+            cur_tok = getNextToken();
+            WhileAST st;
+            st.exp = full_expression();
+            match(tok_do);
+            cur_tok = getNextToken();
+            st.body = command();
+            return st.clone();
+        }
         case tok_begin: {
             cur_tok = getNextToken();
             BlockAST block;
@@ -492,7 +501,7 @@ const llvm::Module &Parser::Generate() {
 
     // create writeln function
     {
-        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writeln", MilaModule);
         for (auto &Arg: F->args())
@@ -501,7 +510,7 @@ const llvm::Module &Parser::Generate() {
 
     // create write function
     {
-        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "write", MilaModule);
         for (auto &Arg: F->args())
@@ -509,7 +518,7 @@ const llvm::Module &Parser::Generate() {
     }
     //create readln function
     {
-        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32PtrTy(MilaContext));
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32PtrTy(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32PtrTy(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "readln", MilaModule);
         for (auto &Arg: F->args())

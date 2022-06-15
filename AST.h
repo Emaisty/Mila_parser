@@ -122,13 +122,13 @@ public:
                 return MilaBuilder.CreateMul(L, R, "multmp");
             case '/':
                 return MilaBuilder.CreateFDiv(L, R, "divtmp");
-            /*case '&':
-                L = MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
-                return MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
-                return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
-            case '|':
-                L = MilaBuilder.CreateLogicalOr(L, R, "ortmp");
-                return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);*/
+                /*case '&':
+                    L = MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
+                    return MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
+                    return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                case '|':
+                    L = MilaBuilder.CreateLogicalOr(L, R, "ortmp");
+                    return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);*/
             case '>':
                 switch (adop) {
                     case '=':
@@ -196,6 +196,40 @@ public:
     virtual void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) = 0;
 };
 
+class WhileAST : public ComandAST {
+public:
+    WhileAST *clone() const override {
+        return new WhileAST(*this);
+    }
+
+    void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
+        Function *TheFunction = MilaBuilder.GetInsertBlock()->getParent();
+
+        BasicBlock *CondBB = BasicBlock::Create(MilaContext, "condition", TheFunction);
+        BasicBlock *BodyBB = BasicBlock::Create(MilaContext, "while_body");
+        BasicBlock *ExitBB = BasicBlock::Create(MilaContext, "exit");
+
+        MilaBuilder.CreateBr(CondBB);
+
+        MilaBuilder.SetInsertPoint(CondBB);
+        Value *Val = exp->codegen(MilaContext, MilaBuilder, MilaModule);
+        Val = MilaBuilder.CreateICmpNE(Val, ConstantInt::get(MilaContext, APInt(32, 0)), "whilecond");
+
+        MilaBuilder.CreateCondBr(Val, BodyBB, ExitBB);
+
+        TheFunction->getBasicBlockList().push_back(BodyBB);
+        MilaBuilder.SetInsertPoint(BodyBB);
+        body->codegen(MilaContext, MilaBuilder, MilaModule);
+        MilaBuilder.CreateBr(CondBB);
+
+        TheFunction->getBasicBlockList().push_back(ExitBB);
+        MilaBuilder.SetInsertPoint(ExitBB);
+    }
+
+    ExpAST *exp;
+    ComandAST *body;
+};
+
 class BlockAST : public ComandAST {
 public:
     BlockAST *clone() const override {
@@ -255,8 +289,6 @@ public:
 
         MilaBuilder.CreateBr(MergeBB);
         // Codegen of 'Then' can change the current block, update ThenBB for the PHI.
-        ThenBB = MilaBuilder.GetInsertBlock();
-
         // Emit else block.
         if (else_st) {
             TheFunction->getBasicBlockList().push_back(ElseBB);

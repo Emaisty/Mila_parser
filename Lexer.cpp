@@ -41,7 +41,9 @@ const struct {
         {"writeln", tok_writeln},
         {"if",      tok_if},
         {"then",    tok_then},
-        {"else",    tok_else}
+        {"else",    tok_else},
+        {"while",   tok_while},
+        {"do",      tok_do}
 };
 
 
