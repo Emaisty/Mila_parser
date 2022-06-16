@@ -88,7 +88,9 @@ enum Token {
     //read write
     tok_readln,
     tok_writeln,
-    tok_write
+    tok_write,
+    tok_int,
+    tok_float
 
 };
 

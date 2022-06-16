@@ -29,3 +29,11 @@ int readfln(double *x) {
     scanf("%lf", x);
     return 0;
 }
+
+int double_to_int(double a) {
+    return a;
+}
+
+double int_to_double(int a) {
+    return a;
+}

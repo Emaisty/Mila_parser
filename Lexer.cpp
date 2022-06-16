@@ -44,7 +44,8 @@ const struct {
         {"then",    tok_then},
         {"else",    tok_else},
         {"while",   tok_while},
-        {"do",      tok_do}
+        {"do",      tok_do},
+        {"int",     tok_int}
 };
 
 

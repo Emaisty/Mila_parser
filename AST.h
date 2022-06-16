@@ -36,6 +36,7 @@ CreateEntryBlockAllocaDouble(Function *TheFunction, StringRef VarName, llvm::LLV
     return TmpB.CreateAlloca(Type::getDoubleTy(MilaContext), nullptr, VarName);
 }
 
+
 class ExpAST {
 public:
     virtual ~ExpAST() {};
@@ -44,6 +45,72 @@ public:
 
     virtual Value *
     codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) = 0;
+};
+
+class PrototypeAST {
+public:
+    std::string Name;
+    std::vector<std::string> Args;
+
+    Function *
+    codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) {
+
+    }
+
+};
+
+class FunctionAST {
+public:
+    std::unique_ptr<PrototypeAST> Proto;
+    std::unique_ptr<ExpAST> Body;
+
+    Function *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) {
+
+    }
+};
+
+class FuncCallAST : public ExpAST {
+public:
+    FuncCallAST *clone() const override {
+        return new FuncCallAST(*this);
+    }
+
+    Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
+
+    }
+
+    PrototypeAST prot;
+
+};
+
+class IntCastCallAST : public ExpAST {
+public:
+    IntCastCallAST *clone() const override {
+        return new IntCastCallAST(*this);
+    }
+
+    Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
+        return MilaBuilder.CreateCall(MilaModule.getFunction("double_to_int"), {
+                exp
+        });
+    }
+
+    Value *exp;
+};
+
+class DoubleCastCallAST : public ExpAST {
+public:
+    DoubleCastCallAST *clone() const override {
+        return new DoubleCastCallAST(*this);
+    }
+
+    Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
+        return MilaBuilder.CreateCall(MilaModule.getFunction("int_to_double"), {
+                exp
+        });
+    }
+
+    Value *exp;
 };
 
 class FloatAST : public ExpAST {
@@ -160,8 +227,16 @@ public:
 
             }
         } else {
-            L = MilaBuilder.CreateFPCast(L, Type::getDoubleTy(MilaContext));
-            R = MilaBuilder.CreateFPCast(R, Type::getDoubleTy(MilaContext));
+            if (L->getType()->isIntegerTy()) {
+                DoubleCastCallAST d;
+                d.exp = L;
+                L = d.codegen(MilaContext, MilaBuilder, MilaModule);
+            }
+            if (R->getType()->isIntegerTy()) {
+                DoubleCastCallAST d;
+                d.exp = R;
+                R = d.codegen(MilaContext, MilaBuilder, MilaModule);
+            }
             switch (op) {
                 case '+':
                     return MilaBuilder.CreateFAdd(L, R, "addtmp");
@@ -255,6 +330,7 @@ public:
     }
 
 };
+
 
 struct Variable {
     enum Type {

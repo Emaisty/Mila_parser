@@ -713,6 +713,24 @@ const llvm::Module &Parser::Generate() {
             Arg.setName("x");
     }
 
+    //create cast to double func
+    {
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getDoubleTy(MilaContext), Ints, false);
+        llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "int_to_double", MilaModule);
+        for (auto &Arg: F->args())
+            Arg.setName("x");
+    }
+
+    //create to cast to int func
+    {
+        std::vector<llvm::Type *> Floats(1, llvm::Type::getDoubleTy(MilaContext));
+        llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Floats, false);
+        llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "double_to_int", MilaModule);
+        for (auto &Arg: F->args())
+            Arg.setName("x");
+    }
+
     // create main function
     {
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), false);
