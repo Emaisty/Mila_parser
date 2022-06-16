@@ -14,8 +14,8 @@ InputCharType Lexer::type_of_char() {
         return NUMBER;
     else if (cur_symb == EOF || cur_symb == 0)
         return END;
-    else if ((cur_symb >= ':' && cur_symb <= '?') || (cur_symb >= '(' && cur_symb <= '-') || cur_symb == '$' ||
-             cur_symb == '&')
+    else if ((cur_symb >= ':' && cur_symb <= '?') || (cur_symb >= '(' && cur_symb <= '.') || cur_symb == '$' ||
+             cur_symb == '&' || (cur_symb >= '[' && cur_symb <= ']'))
         return SPE_SYMB;
     else if (cur_symb <= ' ')
         return WHITE_SPACE;
@@ -34,6 +34,7 @@ const struct {
         {"var",     tok_var},
         {"const",   tok_const},
         {"integer", tok_integer},
+        {"float",   tok_double},
         {"div",     tok_div},
         {"mod",     tok_mod},
         {"readln",  tok_readln},
@@ -64,15 +65,26 @@ Token Lexer::readString() {
 
 }
 
-Token Lexer::readNumber_dec() {
+Token Lexer::readNumber() {
     int sum = 0;
     while (type_of_char() == NUMBER) {
         sum *= 10;
         sum += cur_symb - 48;
         cur_symb = readSymbol();
     }
+    if (type_of_char() == SPE_SYMB && cur_symb == '.') {
+        double sum_d = sum, base = 0.1;
+        cur_symb = readSymbol();
+        while (type_of_char() == NUMBER) {
+            sum_d += base * (cur_symb - 48);
+            base /= 10;
+            cur_symb = readSymbol();
+        }
+        m_DouVal = sum_d;
+        return tok_number_double;
+    }
     m_NumVal = sum;
-    return tok_integer;
+    return tok_number_int;
 }
 
 Token Lexer::readNumber_oct() {
@@ -89,7 +101,7 @@ Token Lexer::readNumber_oct() {
         base *= 8;
     }
     m_NumVal = sum;
-    return tok_integer;
+    return tok_number_int;
 }
 
 Token Lexer::readNumber_hex() {
@@ -110,7 +122,7 @@ Token Lexer::readNumber_hex() {
 
     }
     m_NumVal = sum;
-    return tok_integer;
+    return tok_number_int;
 }
 
 Token Lexer::readSpe() {
@@ -136,6 +148,10 @@ Token Lexer::readSpe() {
             return tok_dot;
         case ',':
             return tok_comma;
+        case '[':
+            return tok_opsqbrak;
+        case ']':
+            return tok_clsqbrak;
         case '<':
             if (type_of_char() == SPE_SYMB && cur_symb == '>') {
                 cur_symb = readSymbol();
@@ -169,6 +185,10 @@ Token Lexer::readSpe() {
         case '$':
             return readNumber_hex();
         case '!':
+            if (type_of_char() == SPE_SYMB && cur_symb == '=') {
+                cur_symb = readSymbol();
+                return tok_notequal;
+            }
             return tok_not;
         case '(':
             return tok_opbrak;
@@ -185,7 +205,7 @@ Token Lexer::gettok() {
         return readString();
     }
     if (type_of_char() == NUMBER) {
-        return readNumber_dec();
+        return readNumber();
     }
     if (type_of_char() == END) {
         return tok_eof;

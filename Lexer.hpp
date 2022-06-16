@@ -14,7 +14,8 @@ enum Token {
 
     // numbers and identifiers
     tok_identifier,
-    tok_number,
+    tok_number_int,
+    tok_number_double,
 
     // keywords
     tok_begin,
@@ -30,7 +31,7 @@ enum Token {
     tok_while,
     tok_exit,
     tok_var,
-    tok_integer, //16
+    tok_integer, //17
     tok_double,
     tok_for,
     tok_do,
@@ -40,7 +41,7 @@ enum Token {
     tok_lessequal,
     tok_greaterequal,
     tok_assign,
-    tok_or,
+    tok_or,   //25
 
     //less or greater
     tok_less,
@@ -53,7 +54,7 @@ enum Token {
     tok_mod,
     tok_div,
     tok_not,
-    tok_and, //31
+    tok_and, //32
     tok_xor,
 
     // keywords in for loop
@@ -71,7 +72,7 @@ enum Token {
     //math operators
     tok_plus,
     tok_minus,
-    tok_mul, // 40
+    tok_mul, // 41
 
     //wtf
     tok_dot,
@@ -80,6 +81,8 @@ enum Token {
     tok_clbrak,
     tok_opfigbrak,
     tok_clfigbrak,
+    tok_opsqbrak,
+    tok_clsqbrak,
 
 
     //read write
@@ -115,7 +118,7 @@ public:
 
     Token readString();
 
-    Token readNumber_dec();
+    Token readNumber();
 
     Token readNumber_oct();
 

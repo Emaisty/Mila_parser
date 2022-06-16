@@ -23,20 +23,18 @@ using namespace llvm;
 
 static std::map<std::string, AllocaInst *> NamedValues;
 
-static AllocaInst *CreateEntryBlockAlloca(Function *TheFunction, StringRef VarName, llvm::LLVMContext &MilaContext) {
+static std::map<std::string, GlobalValue *> GlobNamedValues;
+
+static AllocaInst *CreateEntryBlockAllocaInt(Function *TheFunction, StringRef VarName, llvm::LLVMContext &MilaContext) {
     IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
     return TmpB.CreateAlloca(Type::getInt32Ty(MilaContext), nullptr, VarName);
 }
 
-struct Variable {
-    enum Type {
-        integer, float_number
-    };
-    Type type;
-    int int_val;
-    double float_val;
-    bool if_const;
-};
+static AllocaInst *
+CreateEntryBlockAllocaDouble(Function *TheFunction, StringRef VarName, llvm::LLVMContext &MilaContext) {
+    IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+    return TmpB.CreateAlloca(Type::getDoubleTy(MilaContext), nullptr, VarName);
+}
 
 class ExpAST {
 public:
@@ -57,7 +55,7 @@ public:
     }
 
     Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
-
+        return ConstantFP::get(MilaContext, APFloat(value));
     }
 };
 
@@ -87,11 +85,15 @@ public:
 
     Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
         AllocaInst *A = NamedValues[name];
-        if (!A) {
+        GlobalValue *B = GlobNamedValues[name];
+        if (!A && !B) {
             std::cout << "not known value\n";
             throw "Error";
         }
-        return MilaBuilder.CreateLoad(A->getAllocatedType(), A, name.c_str());
+        if (A)
+            return MilaBuilder.CreateLoad(A->getAllocatedType(), A, name.c_str());
+        else
+            return MilaBuilder.CreateLoad(B->getType()->getElementType(), B, name.c_str());
     }
 
     std::string name;
@@ -110,52 +112,100 @@ public:
     Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
         Value *L = left->codegen(MilaContext, MilaBuilder, MilaModule);
         Value *R = right->codegen(MilaContext, MilaBuilder, MilaModule);
-
         if (!L || !R)
             return nullptr;
-        switch (op) {
-            case '+':
-                return MilaBuilder.CreateAdd(L, R, "addtmp");
-            case '-':
-                return MilaBuilder.CreateSub(L, R, "subtmp");
-            case '*':
-                return MilaBuilder.CreateMul(L, R, "multmp");
-            case '/':
-                return MilaBuilder.CreateUDiv(L, R, "divtmp");
-            case 'm':
-                return MilaBuilder.CreateURem(L, R, "modtmp");
-                /*case '&':
-                    L = MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
-                    return MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
+        if (L->getType()->isIntegerTy() && R->getType()->isIntegerTy()) {
+            switch (op) {
+                case '+':
+                    return MilaBuilder.CreateAdd(L, R, "addtmp");
+                case '-':
+                    return MilaBuilder.CreateSub(L, R, "subtmp");
+                case '*':
+                    return MilaBuilder.CreateMul(L, R, "multmp");
+                case '/':
+                    return MilaBuilder.CreateUDiv(L, R, "divtmp");
+                case 'm':
+                    return MilaBuilder.CreateURem(L, R, "modtmp");
+                    /*case '&':
+                        L = MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
+                        return MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
+                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                    case '|':
+                        L = MilaBuilder.CreateLogicalOr(L, R, "ortmp");
+                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);*/
+                case '>':
+                    switch (adop) {
+                        case '=':
+                            L = MilaBuilder.CreateICmpSGE(L, R, "getmp");
+                            return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                        default:
+                            L = MilaBuilder.CreateICmpSGT(L, R, "gttmp");
+                            return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                    }
+                case '<':
+                    switch (adop) {
+                        case '=':
+                            L = MilaBuilder.CreateICmpSLE(L, R, "letmp");
+                            return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                        default:
+                            L = MilaBuilder.CreateICmpSLT(L, R, "lttmp");
+                            return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                    }
+                case '=':
+                    L = MilaBuilder.CreateICmpEQ(L, R, "eqtmp");
                     return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
-                case '|':
-                    L = MilaBuilder.CreateLogicalOr(L, R, "ortmp");
-                    return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);*/
-            case '>':
-                switch (adop) {
-                    case '=':
-                        L = MilaBuilder.CreateICmpSGE(L, R, "getmp");
-                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
-                    default:
-                        L = MilaBuilder.CreateICmpSGT(L, R, "gttmp");
-                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
-                }
-            case '<':
-                switch (adop) {
-                    case '=':
-                        L = MilaBuilder.CreateICmpSLE(L, R, "letmp");
-                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
-                    default:
-                        L = MilaBuilder.CreateICmpSLT(L, R, "lttmp");
-                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
-                }
-            case '=':
-                L = MilaBuilder.CreateICmpEQ(L, R, "eqtmp");
-                return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
-            case '!':
-                L = MilaBuilder.CreateICmpNE(L, R, "netmp");
-                return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                case '!':
+                    L = MilaBuilder.CreateICmpNE(L, R, "netmp");
+                    return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
 
+            }
+        } else {
+            L = MilaBuilder.CreateFPCast(L, Type::getDoubleTy(MilaContext));
+            R = MilaBuilder.CreateFPCast(R, Type::getDoubleTy(MilaContext));
+            switch (op) {
+                case '+':
+                    return MilaBuilder.CreateFAdd(L, R, "addtmp");
+                case '-':
+                    return MilaBuilder.CreateFSub(L, R, "subtmp");
+                case '*':
+                    return MilaBuilder.CreateFMul(L, R, "multmp");
+                case '/':
+                    return MilaBuilder.CreateFDiv(L, R, "divtmp");
+                case 'm':
+                    return MilaBuilder.CreateFRem(L, R, "modtmp");
+                    /*case '&':
+                        L = MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
+                        return MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
+                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                    case '|':
+                        L = MilaBuilder.CreateLogicalOr(L, R, "ortmp");
+                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);*/
+                case '>':
+                    switch (adop) {
+                        case '=':
+                            L = MilaBuilder.CreateICmpSGT(L, R, "getmp");
+                            return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                        default:
+                            L = MilaBuilder.CreateICmpSGT(L, R, "gttmp");
+                            return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                    }
+                case '<':
+                    switch (adop) {
+                        case '=':
+                            L = MilaBuilder.CreateICmpSLE(L, R, "letmp");
+                            return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                        default:
+                            L = MilaBuilder.CreateICmpSLT(L, R, "lttmp");
+                            return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                    }
+                case '=':
+                    L = MilaBuilder.CreateICmpEQ(L, R, "eqtmp");
+                    return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+                case '!':
+                    L = MilaBuilder.CreateICmpNE(L, R, "netmp");
+                    return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+
+            }
         }
     }
 };
@@ -170,7 +220,25 @@ public:
     }
 
     Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
-
+        Value *L = exp->codegen(MilaContext, MilaBuilder, MilaModule);
+        if (L->getType()->isIntegerTy()) {
+            switch (op) {
+                case '-':
+                    return MilaBuilder.CreateSub(ConstantInt::get(MilaContext, APInt(32, 0)), L, "subtmp");
+                case '!':
+                    L = MilaBuilder.CreateICmpEQ(L, ConstantInt::get(MilaContext, APInt(32, 0)), "eqtmp");
+                    return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+            }
+        }
+        if (L->getType()->isDoubleTy()) {
+            switch (op) {
+                case '-':
+                    return MilaBuilder.CreateFSub(ConstantFP::get(MilaContext, APFloat(0.0)), L, "subtmp");
+                case '!':
+                    L = MilaBuilder.CreateICmpEQ(L, ConstantFP::get(MilaContext, APFloat(0.0)), "eqtmp");
+                    return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
+            }
+        }
     }
 };
 
@@ -186,6 +254,17 @@ public:
         return exp->codegen(MilaContext, MilaBuilder, MilaModule);
     }
 
+};
+
+struct Variable {
+    enum Type {
+        integer, float_number
+    };
+    Type type;
+    int int_val;
+    double float_val;
+    bool if_const;
+    ExpAST *exp;
 };
 
 //command
@@ -322,9 +401,41 @@ public:
     }
 
     void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
-        MilaBuilder.CreateCall(MilaModule.getFunction("writeln"), {
-                exp->codegen(MilaContext, MilaBuilder, MilaModule)
-        });
+        Value *val = exp->codegen(MilaContext, MilaBuilder, MilaModule);
+        if (val->getType()->isIntegerTy()) {
+            MilaBuilder.CreateCall(MilaModule.getFunction("writeln"), {
+                    val
+            });
+        }
+        if (val->getType()->isDoubleTy()) {
+            MilaBuilder.CreateCall(MilaModule.getFunction("writefln"), {
+                    val
+            });
+        }
+    }
+
+    ExpAST *exp;
+};
+
+class WriteAST : public ComandAST {
+public:
+
+    WriteAST *clone() const override {
+        return new WriteAST(*this);
+    }
+
+    void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
+        Value *val = exp->codegen(MilaContext, MilaBuilder, MilaModule);
+        if (val->getType()->isIntegerTy()) {
+            MilaBuilder.CreateCall(MilaModule.getFunction("write"), {
+                    val
+            });
+        }
+        if (val->getType()->isDoubleTy()) {
+            MilaBuilder.CreateCall(MilaModule.getFunction("writef"), {
+                    val
+            });
+        }
     }
 
     ExpAST *exp;
@@ -337,9 +448,25 @@ public:
     }
 
     void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
-        MilaBuilder.CreateCall(MilaModule.getFunction("readln"), {
-                NamedValues[var->name]
-        });
+        Value *A = NamedValues[var->name], *B = GlobNamedValues[var->name], *C;
+        if (!A && !B) {
+            std::cout << "not known value\n";
+            throw "Error";
+        }
+        if (A)
+            C = A;
+        else
+            C = B;
+        if (C->getType()->getPointerElementType()->isIntegerTy()) {
+            MilaBuilder.CreateCall(MilaModule.getFunction("readln"), {
+                    C
+            });
+        }
+        if (C->getType()->getPointerElementType()->isDoubleTy()) {
+            MilaBuilder.CreateCall(MilaModule.getFunction("readfln"), {
+                    C
+            });
+        }
     }
 
     VarAST *var;

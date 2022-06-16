@@ -46,11 +46,27 @@ void Parser::vars() {
                 a.type = Variable::integer;
                 a.int_val = 0;
                 a.if_const = false;
+                a.exp = nullptr;
                 var.insert(std::make_pair(names[i], a));
             }
             names.clear();
             break;
         case tok_double:
+            for (int i = 0; i < names.size(); ++i) {
+                for (auto j = var.begin(); j != var.end(); ++j) {
+                    if (names[i] == j->first) {
+                        std::cout << "var already exist";
+                        throw "";
+                    }
+                }
+                Variable a;
+                a.type = Variable::float_number;
+                a.float_val = 0;
+                a.if_const = false;
+                a.exp = nullptr;
+                var.insert(std::make_pair(names[i], a));
+            }
+            names.clear();
             break;
         default:
             std::cout << "Error. Unknown type of var";
@@ -84,12 +100,27 @@ void Parser::vars() {
                     a.type = Variable::integer;
                     a.int_val = 0;
                     a.if_const = false;
+                    a.exp = nullptr;
                     var.insert(std::make_pair(names[i], a));
                 }
                 names.clear();
                 break;
             case tok_double:
-                //TODO
+                for (int i = 0; i < names.size(); ++i) {
+                    for (auto j = var.begin(); j != var.end(); ++j) {
+                        if (names[i] == j->first) {
+                            std::cout << "var already exist";
+                            throw "";
+                        }
+                    }
+                    Variable a;
+                    a.type = Variable::float_number;
+                    a.float_val = 0;
+                    a.if_const = false;
+                    a.exp = nullptr;
+                    var.insert(std::make_pair(names[i], a));
+                }
+                names.clear();
                 break;
             default:
                 std::cout << "Error. Unknown type of var";
@@ -105,119 +136,99 @@ void Parser::consts() {
     std::string name;
     match(tok_identifier);
     name = m_Lexer.identifierStr();
+    for (auto j = var.begin(); j != var.end(); ++j) {
+        if (name == j->first) {
+            std::cout << "var already exist";
+            throw "";
+        }
+    }
     cur_tok = getNextToken();
     match(tok_equal);
     cur_tok = getNextToken();
-    switch (cur_tok) {
-        case tok_integer:
+    Variable a;
+    if (cur_tok == tok_number_int) {
+        a.type = Variable::integer;
+        a.int_val = m_Lexer.numVal();
+    } else {
+        a.type = Variable::float_number;
+        a.float_val = m_Lexer.douVal();
+    }
+    a.if_const = true;
+    a.exp = full_expression();
+    var.insert(std::make_pair(name, a));
+    while (cur_tok == tok_comma) {
+        cur_tok = getNextToken();
+        match(tok_identifier);
+        name = m_Lexer.identifierStr();
+        for (auto j = var.begin(); j != var.end(); ++j) {
+            if (name == j->first) {
+                std::cout << "var already exist";
+                throw "";
+            }
+        }
+        cur_tok = getNextToken();
+        match(tok_equal);
+        cur_tok = getNextToken();
+        Variable a;
+        if (cur_tok == tok_number_int) {
+            a.type = Variable::integer;
+            a.int_val = m_Lexer.numVal();
+        } else {
+            a.type = Variable::float_number;
+            a.float_val = m_Lexer.douVal();
+        }
+        a.if_const = true;
+        a.exp = full_expression();
+        var.insert(std::make_pair(name, a));
+    }
+    match(tok_semicolon);
+    cur_tok = getNextToken();
+    while (cur_tok == tok_identifier) {
+        name = m_Lexer.identifierStr();
+        for (auto j = var.begin(); j != var.end(); ++j) {
+            if (name == j->first) {
+                std::cout << "var already exist";
+                throw "";
+            }
+        }
+        cur_tok = getNextToken();
+        match(tok_equal);
+        cur_tok = getNextToken();
+        Variable a;
+        if (cur_tok == tok_number_int) {
+            a.type = Variable::integer;
+            a.int_val = m_Lexer.numVal();
+        } else {
+            a.type = Variable::float_number;
+            a.float_val = m_Lexer.douVal();
+        }
+        a.if_const = true;
+        a.exp = full_expression();
+        var.insert(std::make_pair(name, a));
+        while (cur_tok == tok_comma) {
+            cur_tok = getNextToken();
+            match(tok_identifier);
+            name = m_Lexer.identifierStr();
             for (auto j = var.begin(); j != var.end(); ++j) {
                 if (name == j->first) {
                     std::cout << "var already exist";
                     throw "";
                 }
             }
-            Variable a;
-            a.type = Variable::integer;
-            a.int_val = m_Lexer.numVal();
-            a.if_const = true;
-            var.insert(std::make_pair(name, a));
-            break;
-        case tok_double:
-            //TODO
-            break;
-        default:
-            std::cout << "Error.";
-            throw "";
-    }
-    cur_tok = getNextToken();
-    while (cur_tok == tok_comma) {
-        cur_tok = getNextToken();
-        match(tok_identifier);
-        name = m_Lexer.identifierStr();
-        cur_tok = getNextToken();
-        match(tok_equal);
-        cur_tok = getNextToken();
-        switch (cur_tok) {
-            case tok_integer:
-                for (auto j = var.begin(); j != var.end(); ++j) {
-                    if (name == j->first) {
-                        std::cout << "var already exist";
-                        throw "";
-                    }
-                }
-                Variable a;
-                a.type = Variable::integer;
-                a.int_val = m_Lexer.numVal();
-                a.if_const = true;
-                var.insert(std::make_pair(name, a));
-                break;
-            case tok_double:
-                //TODO
-                break;
-            default:
-                std::cout << "Error.";
-                throw "";
-        }
-        cur_tok = getNextToken();
-    }
-    match(tok_semicolon);
-    cur_tok = getNextToken();
-    while (cur_tok == tok_identifier) {
-        name = m_Lexer.identifierStr();
-        cur_tok = getNextToken();
-        match(tok_equal);
-        cur_tok = getNextToken();
-        switch (cur_tok) {
-            case tok_integer:
-                for (auto j = var.begin(); j != var.end(); ++j) {
-                    if (name == j->first) {
-                        std::cout << "var already exist";
-                        throw "";
-                    }
-                }
-                Variable a;
-                a.type = Variable::integer;
-                a.int_val = m_Lexer.numVal();
-                a.if_const = true;
-                var.insert(std::make_pair(name, a));
-                break;
-            case tok_double:
-                //TODO
-                break;
-            default:
-                std::cout << "Error.";
-                throw "";
-        }
-        cur_tok = getNextToken();
-        while (cur_tok == tok_comma) {
-            cur_tok = getNextToken();
-            match(tok_identifier);
-            name = m_Lexer.identifierStr();
             cur_tok = getNextToken();
             match(tok_equal);
             cur_tok = getNextToken();
-            switch (cur_tok) {
-                case tok_integer:
-                    for (auto j = var.begin(); j != var.end(); ++j) {
-                        if (name == j->first) {
-                            std::cout << "var already exist";
-                            throw "";
-                        }
-                    }
-                    Variable a;
-                    a.type = Variable::integer;
-                    a.int_val = m_Lexer.numVal();
-                    a.if_const = true;
-                    var.insert(std::make_pair(name, a));
-                    break;
-                case tok_double:
-                    //TODO
-                    break;
-                default:
-                    std::cout << "Error.";
-                    throw "";
+            Variable a;
+            if (cur_tok == tok_number_int) {
+                a.type = Variable::integer;
+                a.int_val = m_Lexer.numVal();
+            } else {
+                a.type = Variable::float_number;
+                a.float_val = m_Lexer.douVal();
             }
-            cur_tok = getNextToken();
+            a.if_const = true;
+            a.exp = full_expression();
+            var.insert(std::make_pair(name, a));
         }
         match(tok_semicolon);
         cur_tok = getNextToken();
@@ -249,11 +260,17 @@ ExpAST *Parser::faktor() {
             cur_tok = getNextToken();
             return var.clone();
         }
-        case tok_integer: {
+        case tok_number_int: {
             IntAST integer;
             integer.value = m_Lexer.numVal();
             cur_tok = getNextToken();
             return integer.clone();
+        }
+        case tok_number_double: {
+            FloatAST fl;
+            fl.value = m_Lexer.douVal();
+            cur_tok = getNextToken();
+            return fl.clone();
         }
         case tok_opbrak: {
             cur_tok = getNextToken();
@@ -483,12 +500,21 @@ ExpAST *Parser::full_expression() {
     return b;
 }
 
+ExpAST *Parser::write() {
+    match(tok_opbrak);
+    cur_tok = getNextToken();
+    ExpAST *a;
+    a = full_expression();
+    match(tok_clbrak);
+    cur_tok = getNextToken();
+    return a;
+}
 
 ExpAST *Parser::writeln() {
     match(tok_opbrak);
     cur_tok = getNextToken();
     ExpAST *a;
-    a = expression();
+    a = full_expression();
     match(tok_clbrak);
     cur_tok = getNextToken();
     return a;
@@ -520,6 +546,14 @@ ComandAST *Parser::command() {
             match(tok_semicolon);
             cur_tok = getNextToken();
             return assign.clone();
+        }
+        case tok_write: {
+            cur_tok = getNextToken();
+            WriteAST write;
+            write.exp = writeln();
+            match(tok_semicolon);
+            cur_tok = getNextToken();
+            return write.clone();
         }
         case tok_writeln: {
             cur_tok = getNextToken();
@@ -647,8 +681,34 @@ const llvm::Module &Parser::Generate() {
     //create readln function
     {
         std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32PtrTy(MilaContext));
-        llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32PtrTy(MilaContext), Ints, false);
+        llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "readln", MilaModule);
+        for (auto &Arg: F->args())
+            Arg.setName("x");
+    }
+
+    // create writefln function
+    {
+        std::vector<llvm::Type *> Floats(1, llvm::Type::getDoubleTy(MilaContext));
+        llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Floats, false);
+        llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writefln", MilaModule);
+        for (auto &Arg: F->args())
+            Arg.setName("x");
+    }
+
+    // create writef function
+    {
+        std::vector<llvm::Type *> Floats(1, llvm::Type::getDoubleTy(MilaContext));
+        llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Floats, false);
+        llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writef", MilaModule);
+        for (auto &Arg: F->args())
+            Arg.setName("x");
+    }
+    //create readfln function
+    {
+        std::vector<llvm::Type *> Floats(1, llvm::Type::getDoublePtrTy(MilaContext));
+        llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Floats, false);
+        llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "readfln", MilaModule);
         for (auto &Arg: F->args())
             Arg.setName("x");
     }
@@ -664,16 +724,92 @@ const llvm::Module &Parser::Generate() {
 
         // declare variables
         for (auto i = program->vars->vars_and_const.begin(); i != program->vars->vars_and_const.end(); ++i) {
-            AllocaInst *Alloca = CreateEntryBlockAlloca(MainFunction, i->first, MilaContext);
-            Value *StartVal = ConstantInt::get(MilaContext, APInt(32, i->second.int_val));
+            GlobalVariable *glb;
+            if (i->second.type == Variable::integer) {
+                if (i->second.if_const) {
+                    glb = new GlobalVariable(MilaModule, Type::getInt32Ty(MilaContext),
+                                             true,
+                                             GlobalValue::ExternalLinkage,
+                                             0,
+                                             i->first);
+                    if (i->second.exp)
+                        glb->setInitializer(
+                                dyn_cast<ConstantInt>(i->second.exp->codegen(MilaContext, MilaBuilder, MilaModule)));
+                    else
+                        glb->setInitializer(ConstantInt::get(MilaContext, APInt(32, i->second.int_val)));
+
+                } else {
+                    glb = new GlobalVariable(MilaModule, Type::getInt32Ty(MilaContext),
+                                             false,
+                                             GlobalValue::ExternalLinkage,
+                                             0,
+                                             i->first);
+                    if (i->second.exp)
+                        glb->setInitializer(
+                                dyn_cast<ConstantInt>(i->second.exp->codegen(MilaContext, MilaBuilder, MilaModule)));
+                    else
+                        glb->setInitializer(ConstantInt::get(MilaContext, APInt(32, i->second.int_val)));
+
+                }
+            }
+            if (i->second.type == Variable::float_number) {
+                if (i->second.if_const) {
+                    glb = new GlobalVariable(MilaModule, Type::getDoubleTy(MilaContext),
+                                             true,
+                                             GlobalValue::ExternalLinkage,
+                                             0,
+                                             i->first);
+                    if (i->second.exp)
+                        glb->setInitializer(
+                                dyn_cast<ConstantFP>(
+                                        i->second.exp->codegen(MilaContext, MilaBuilder, MilaModule)));
+                    else
+                        glb->setInitializer(ConstantFP::get(MilaContext, APFloat(i->second.float_val)));
+
+                } else {
+                    glb = new GlobalVariable(MilaModule, Type::getDoubleTy(MilaContext),
+                                             false,
+                                             GlobalValue::ExternalLinkage,
+                                             0,
+                                             i->first);
+                    if (i->second.exp)
+                        glb->setInitializer(
+                                dyn_cast<ConstantFP>(
+                                        i->second.exp->codegen(MilaContext, MilaBuilder, MilaModule)));
+                    else
+                        glb->setInitializer(ConstantFP::get(MilaContext, APFloat(i->second.float_val)));
+
+                }
+            }
+            GlobNamedValues[i->first] = glb;
+            /*AllocaInst *Alloca = CreateEntryBlockAllocaInt(MainFunction, i->first, MilaContext);
+            Value *StartVal;
+            if (i->second.exp) {
+                StartVal = i->second.exp->codegen(MilaContext, MilaBuilder, MilaModule);
+            } else {
+                StartVal = ConstantInt::get(MilaContext, APInt(32, i->second.int_val));
+            }
             MilaBuilder.CreateStore(StartVal, Alloca);
             NamedValues[i->first] = Alloca;
+        } else {
+            AllocaInst *Alloca = CreateEntryBlockAllocaDouble(MainFunction, i->first, MilaContext);
+            Value *StartVal;
+            if (i->second.exp) {
+                StartVal = i->second.exp->codegen(MilaContext, MilaBuilder, MilaModule);
+            } else {
+                StartVal = ConstantFP::get(MilaContext, APFloat(i->second.float_val));
+            }
+            MilaBuilder.CreateStore(StartVal, Alloca);
+            NamedValues[i->first] = Alloca;
+        }*/
+
         }
 
         program->codegen(MilaContext, MilaBuilder, MilaModule);
 
         // return 0
         MilaBuilder.CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(MilaContext), 0));
+
     }
 
     return this->MilaModule;
