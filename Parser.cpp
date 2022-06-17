@@ -30,7 +30,7 @@ ExpAST *Parser::read_var() {
         ArrayElAST ar;
         ar.name = var.name;
         cur_tok = getNextToken();
-        ar.num = read_int();
+        ar.num = full_expression();
         match(tok_clsqbrak);
         cur_tok = getNextToken();
         return ar.clone();

@@ -10,10 +10,10 @@
  * Here are all valid tokens:
  */
 enum Token {
-    tok_eof,
+    tok_eof,   //0
 
     // numbers and identifiers
-    tok_identifier,
+    tok_identifier,    //1
     tok_number_int,
     tok_number_double,
 

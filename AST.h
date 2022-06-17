@@ -195,11 +195,16 @@ public:
 
     Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
         GlobalValue *B = GlobNamedValues[name].glob;
-        return MilaBuilder.CreateExtractValue(MilaBuilder.CreateLoad(B), num - GlobNamedValues[name].st);
+        Value *a = MilaBuilder.CreateSub(num->codegen(MilaContext, MilaBuilder, MilaModule),
+                                         ConstantInt::get(MilaContext, APInt(32, GlobNamedValues[name].st)));
+        Value *i32zero = ConstantInt::get(MilaContext, APInt(32, 0));
+        Value *indices[2] = {i32zero, a};
+        auto i = MilaBuilder.CreateInBoundsGEP(B, ArrayRef<Value *>(indices, 2));
+        return MilaBuilder.CreateLoad(i->getType()->getPointerElementType(), i, name.c_str());
     }
 
     std::string name;
-    int num;
+    ExpAST *num;
 };
 
 class BinoperAST : public ExpAST {
@@ -452,19 +457,52 @@ public:
         if (var_) {
             Value *A = NamedValues[var_->name].alloca, *B = GlobNamedValues[var_->name].glob;
             //MilaBuilder.CreateStore(Val, Variable);
-            if (A)
+            if (A) {
+                if (A->getType()->getPointerElementType()->isIntegerTy() && Val->getType()->isDoubleTy()) {
+                    IntCastCallAST d;
+                    d.exp = Val;
+                    Val = d.codegen(MilaContext, MilaBuilder, MilaModule);
+                }
+                if (A->getType()->getPointerElementType()->isDoubleTy() && Val->getType()->isIntegerTy()) {
+                    DoubleCastCallAST d;
+                    d.exp = Val;
+                    Val = d.codegen(MilaContext, MilaBuilder, MilaModule);
+                }
                 MilaBuilder.CreateStore(Val, A);
-            else
+            } else {
+                if (B->getType()->getPointerElementType()->isIntegerTy() && Val->getType()->isDoubleTy()) {
+                    IntCastCallAST d;
+                    d.exp = Val;
+                    Val = d.codegen(MilaContext, MilaBuilder, MilaModule);
+                }
+                if (B->getType()->getPointerElementType()->isDoubleTy() && Val->getType()->isIntegerTy()) {
+                    DoubleCastCallAST d;
+                    d.exp = Val;
+                    Val = d.codegen(MilaContext, MilaBuilder, MilaModule);
+                }
                 MilaBuilder.CreateStore(Val, B);
+            }
         } else {
             ArrayElAST *al = dynamic_cast<ArrayElAST *>(var);
             GlobalValue *B = GlobNamedValues[al->name].glob;
-            int a = al->num - GlobNamedValues[al->name].st;
-            GetElementPtrInst::CreateInBounds(ArrayType::get(IntegerType::getInt32Ty(MilaContext),
-                                                             GlobNamedValues[al->name].end -
-                                                             GlobNamedValues[al->name].st + 1), B, 0);
-            //auto R = MilaBuilder.CreateExtractValue(MilaBuilder.CreateLoad(B), al->num - GlobNamedValues[al->name].st);
-            //MilaBuilder.CreateStore(Val, B);
+
+            Value *a = MilaBuilder.CreateSub(al->num->codegen(MilaContext, MilaBuilder, MilaModule),
+                                             ConstantInt::get(MilaContext, APInt(32, GlobNamedValues[al->name].st)));
+            Value *i32zero = ConstantInt::get(MilaContext, APInt(32, 0));
+            Value *indices[2] = {i32zero, a};
+
+            auto i = MilaBuilder.CreateInBoundsGEP(B, ArrayRef<Value *>(indices, 2));
+            if (i->getType()->getPointerElementType()->isIntegerTy() && Val->getType()->isDoubleTy()) {
+                IntCastCallAST d;
+                d.exp = Val;
+                Val = d.codegen(MilaContext, MilaBuilder, MilaModule);
+            }
+            if (i->getType()->getPointerElementType()->isDoubleTy() && Val->getType()->isIntegerTy()) {
+                DoubleCastCallAST d;
+                d.exp = Val;
+                Val = d.codegen(MilaContext, MilaBuilder, MilaModule);
+            }
+            MilaBuilder.CreateStore(Val, i);
         }
     }
 
@@ -529,7 +567,11 @@ public:
     void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
         assign->codegen(MilaContext, MilaBuilder, MilaModule);
         Value *res = exp->codegen(MilaContext, MilaBuilder, MilaModule);
-
+        if (dir == 1) {
+            res = MilaBuilder.CreateAdd(res, ConstantInt::get(MilaContext, APInt(32, 1)));
+        } else {
+            res = MilaBuilder.CreateSub(res, ConstantInt::get(MilaContext, APInt(32, 1)));
+        }
         VarAST *var = dynamic_cast<VarAST *>(assign->var);
         ArrayElAST *el;
         if (!var) {
@@ -545,20 +587,18 @@ public:
         MilaBuilder.CreateBr(CondBB);
         MilaBuilder.SetInsertPoint(CondBB);
         Value *r, *L, *all;
+
         if (var) {
             Value *L1 = NamedValues[var->name].alloca, *L2 = GlobNamedValues[var->name].glob;
-            if (L1) {
+            if (L1)
                 all = L1;
-                L = MilaBuilder.CreateLoad(L1->getType(), L1);
-            } else {
+            else
                 all = L2;
-                L = MilaBuilder.CreateLoad(L2->getType()->getPointerElementType(), L2);
-            }
-            r = MilaBuilder.CreateICmpEQ(L, res, "eqtmp");
-
         } else {
 
         }
+        L = var->codegen(MilaContext, MilaBuilder, MilaModule);
+        r = MilaBuilder.CreateICmpEQ(L, res, "eqtmp");
         MilaBuilder.CreateCondBr(r, ExitBB, BodyBB);
 
         TheFunction->getBasicBlockList().push_back(BodyBB);
