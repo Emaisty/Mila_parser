@@ -90,7 +90,8 @@ enum Token {
     tok_writeln,
     tok_write,
     tok_int,
-    tok_float
+    tok_float,
+    tok_of
 
 };
 

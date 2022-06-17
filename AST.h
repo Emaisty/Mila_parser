@@ -21,9 +21,29 @@
 
 using namespace llvm;
 
-static std::map<std::string, AllocaInst *> NamedValues;
+struct Alloc {
+    enum type {
+        array, not_array
+    };
+    type type;
+    AllocaInst *alloca;
 
-static std::map<std::string, GlobalValue *> GlobNamedValues;
+    int st, end;
+};
+
+struct Glob {
+    enum type {
+        array, not_array
+    };
+    type type;
+    GlobalValue *glob;
+
+    int st, end;
+};
+
+static std::map<std::string, Alloc> NamedValues;
+
+static std::map<std::string, Glob> GlobNamedValues;
 
 static AllocaInst *CreateEntryBlockAllocaInt(Function *TheFunction, StringRef VarName, llvm::LLVMContext &MilaContext) {
     IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
@@ -151,8 +171,8 @@ public:
     }
 
     Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
-        AllocaInst *A = NamedValues[name];
-        GlobalValue *B = GlobNamedValues[name];
+        AllocaInst *A = NamedValues[name].alloca;
+        GlobalValue *B = GlobNamedValues[name].glob;
         if (!A && !B) {
             std::cout << "not known value\n";
             throw "Error";
@@ -163,7 +183,23 @@ public:
             return MilaBuilder.CreateLoad(B->getType()->getElementType(), B, name.c_str());
     }
 
+
     std::string name;
+};
+
+class ArrayElAST : public ExpAST {
+public:
+    ArrayElAST *clone() const override {
+        return new ArrayElAST(*this);
+    }
+
+    Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
+        GlobalValue *B = GlobNamedValues[name].glob;
+        return MilaBuilder.CreateExtractValue(MilaBuilder.CreateLoad(B), num - GlobNamedValues[name].st);
+    }
+
+    std::string name;
+    int num;
 };
 
 class BinoperAST : public ExpAST {
@@ -334,10 +370,10 @@ public:
 
 struct Variable {
     enum Type {
-        integer, float_number
+        integer, float_number, array_int, array_double
     };
     Type type;
-    int int_val;
+    int int_val, st, en;
     double float_val;
     bool if_const;
     ExpAST *exp;
@@ -411,13 +447,28 @@ public:
     }
 
     void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
-        Value *Variable = NamedValues[var->name];
+        VarAST *var_ = dynamic_cast<VarAST *>(var);
         Value *Val = exp->codegen(MilaContext, MilaBuilder, MilaModule);
-        //MilaBuilder.CreateStore(Val, Variable);
-        MilaBuilder.CreateStore(Val, Variable);
+        if (var_) {
+            Value *A = NamedValues[var_->name].alloca, *B = GlobNamedValues[var_->name].glob;
+            //MilaBuilder.CreateStore(Val, Variable);
+            if (A)
+                MilaBuilder.CreateStore(Val, A);
+            else
+                MilaBuilder.CreateStore(Val, B);
+        } else {
+            ArrayElAST *al = dynamic_cast<ArrayElAST *>(var);
+            GlobalValue *B = GlobNamedValues[al->name].glob;
+            int a = al->num - GlobNamedValues[al->name].st;
+            GetElementPtrInst::CreateInBounds(ArrayType::get(IntegerType::getInt32Ty(MilaContext),
+                                                             GlobNamedValues[al->name].end -
+                                                             GlobNamedValues[al->name].st + 1), B, 0);
+            //auto R = MilaBuilder.CreateExtractValue(MilaBuilder.CreateLoad(B), al->num - GlobNamedValues[al->name].st);
+            //MilaBuilder.CreateStore(Val, B);
+        }
     }
 
-    VarAST *var;
+    ExpAST *var;
     ExpAST *exp;
 };
 
@@ -467,6 +518,68 @@ public:
 
     ExpAST *exp;
     ComandAST *if_st, *else_st;
+};
+
+class ForAST : public ComandAST {
+public:
+    ForAST *clone() const override {
+        return new ForAST(*this);
+    }
+
+    void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
+        assign->codegen(MilaContext, MilaBuilder, MilaModule);
+        Value *res = exp->codegen(MilaContext, MilaBuilder, MilaModule);
+
+        VarAST *var = dynamic_cast<VarAST *>(assign->var);
+        ArrayElAST *el;
+        if (!var) {
+            el = dynamic_cast<ArrayElAST *> (assign->var);
+        }
+
+        Function *TheFunction = MilaBuilder.GetInsertBlock()->getParent();
+
+        BasicBlock *CondBB = BasicBlock::Create(MilaContext, "condition", TheFunction);
+        BasicBlock *BodyBB = BasicBlock::Create(MilaContext, "for_body");
+        BasicBlock *ExitBB = BasicBlock::Create(MilaContext, "exit");
+
+        MilaBuilder.CreateBr(CondBB);
+        MilaBuilder.SetInsertPoint(CondBB);
+        Value *r, *L, *all;
+        if (var) {
+            Value *L1 = NamedValues[var->name].alloca, *L2 = GlobNamedValues[var->name].glob;
+            if (L1) {
+                all = L1;
+                L = MilaBuilder.CreateLoad(L1->getType(), L1);
+            } else {
+                all = L2;
+                L = MilaBuilder.CreateLoad(L2->getType()->getPointerElementType(), L2);
+            }
+            r = MilaBuilder.CreateICmpEQ(L, res, "eqtmp");
+
+        } else {
+
+        }
+        MilaBuilder.CreateCondBr(r, ExitBB, BodyBB);
+
+        TheFunction->getBasicBlockList().push_back(BodyBB);
+        MilaBuilder.SetInsertPoint(BodyBB);
+        body->codegen(MilaContext, MilaBuilder, MilaModule);
+        if (dir == 1)
+            MilaBuilder.CreateStore(
+                    MilaBuilder.CreateAdd(L, ConstantInt::get(MilaContext, APInt(32, 1)), "addtmp"), all);
+        else
+            MilaBuilder.CreateStore(
+                    MilaBuilder.CreateSub(L, ConstantInt::get(MilaContext, APInt(32, 1)), "addtmp"), all);
+
+        MilaBuilder.CreateBr(CondBB);
+        TheFunction->getBasicBlockList().push_back(ExitBB);
+        MilaBuilder.SetInsertPoint(ExitBB);
+    }
+
+    AssignAST *assign;
+    ComandAST *body;
+    ExpAST *exp;
+    int dir;
 };
 
 class WritelnAST : public ComandAST {
@@ -524,28 +637,33 @@ public:
     }
 
     void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
-        Value *A = NamedValues[var->name], *B = GlobNamedValues[var->name], *C;
-        if (!A && !B) {
-            std::cout << "not known value\n";
-            throw "Error";
-        }
-        if (A)
-            C = A;
-        else
-            C = B;
-        if (C->getType()->getPointerElementType()->isIntegerTy()) {
-            MilaBuilder.CreateCall(MilaModule.getFunction("readln"), {
-                    C
-            });
-        }
-        if (C->getType()->getPointerElementType()->isDoubleTy()) {
-            MilaBuilder.CreateCall(MilaModule.getFunction("readfln"), {
-                    C
-            });
+        VarAST *var_ = dynamic_cast<VarAST *>(var);
+        if (var_) {
+            Value *A = NamedValues[var_->name].alloca, *B = GlobNamedValues[var_->name].glob, *C;
+            if (!A && !B) {
+                std::cout << "not known value\n";
+                throw "Error";
+            }
+            if (A)
+                C = A;
+            else
+                C = B;
+            if (C->getType()->getPointerElementType()->isIntegerTy()) {
+                MilaBuilder.CreateCall(MilaModule.getFunction("readln"), {
+                        C
+                });
+            }
+            if (C->getType()->getPointerElementType()->isDoubleTy()) {
+                MilaBuilder.CreateCall(MilaModule.getFunction("readfln"), {
+                        C
+                });
+            }
+        } else {
+            ArrayElAST *ar = dynamic_cast<ArrayElAST *>(var);
         }
     }
 
-    VarAST *var;
+    ExpAST *var;
 };
 
 class Prog {
@@ -573,7 +691,114 @@ public:
     }
 
     void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) {
+        for (auto i = vars_and_const.begin(); i != vars_and_const.end(); ++i) {
+            GlobalVariable *glb;
+            Glob a;
+            if (i->second.type == Variable::integer) {
+                a.type = Glob::not_array;
+                if (i->second.if_const) {
+                    glb = new GlobalVariable(MilaModule, Type::getInt32Ty(MilaContext),
+                                             true,
+                                             GlobalValue::ExternalLinkage,
+                                             0,
+                                             i->first);
+                    if (i->second.exp)
+                        glb->setInitializer(
+                                dyn_cast<ConstantInt>(i->second.exp->codegen(MilaContext, MilaBuilder, MilaModule)));
+                    else
+                        glb->setInitializer(ConstantInt::get(MilaContext, APInt(32, i->second.int_val)));
 
+                } else {
+                    glb = new GlobalVariable(MilaModule, Type::getInt32Ty(MilaContext),
+                                             false,
+                                             GlobalValue::ExternalLinkage,
+                                             0,
+                                             i->first);
+                    if (i->second.exp)
+                        glb->setInitializer(
+                                dyn_cast<ConstantInt>(i->second.exp->codegen(MilaContext, MilaBuilder, MilaModule)));
+                    else
+                        glb->setInitializer(ConstantInt::get(MilaContext, APInt(32, i->second.int_val)));
+
+                }
+            }
+            if (i->second.type == Variable::float_number) {
+                a.type = Glob::not_array;
+                if (i->second.if_const) {
+                    glb = new GlobalVariable(MilaModule, Type::getDoubleTy(MilaContext),
+                                             true,
+                                             GlobalValue::ExternalLinkage,
+                                             0,
+                                             i->first);
+                    if (i->second.exp)
+                        glb->setInitializer(
+                                dyn_cast<ConstantFP>(
+                                        i->second.exp->codegen(MilaContext, MilaBuilder, MilaModule)));
+                    else
+                        glb->setInitializer(ConstantFP::get(MilaContext, APFloat(i->second.float_val)));
+
+                } else {
+                    glb = new GlobalVariable(MilaModule, Type::getDoubleTy(MilaContext),
+                                             false,
+                                             GlobalValue::ExternalLinkage,
+                                             0,
+                                             i->first);
+                    if (i->second.exp)
+                        glb->setInitializer(
+                                dyn_cast<ConstantFP>(
+                                        i->second.exp->codegen(MilaContext, MilaBuilder, MilaModule)));
+                    else
+                        glb->setInitializer(ConstantFP::get(MilaContext, APFloat(i->second.float_val)));
+
+                }
+            }
+            if (i->second.type == Variable::array_int) {
+                a.type = Glob::array;
+                a.st = i->second.st;
+                a.end = i->second.en;
+                glb = new GlobalVariable(MilaModule, ArrayType::get(IntegerType::getInt32Ty(MilaContext),
+                                                                    i->second.en - i->second.st + 1), false,
+                                         GlobalValue::ExternalLinkage, 0, i->first);
+                glb->setInitializer(ConstantAggregateZero::get(
+                        ArrayType::get(IntegerType::getInt32Ty(MilaContext),
+                                       i->second.en - i->second.st + 1)));
+
+            }
+            if (i->second.type == Variable::array_double) {
+                a.type = Glob::array;
+                a.st = i->second.st;
+                a.end = i->second.en;
+                glb = new GlobalVariable(MilaModule, ArrayType::get(IntegerType::getDoubleTy(MilaContext),
+                                                                    i->second.en - i->second.st + 1), false,
+                                         GlobalValue::ExternalLinkage, 0, i->first);
+                glb->setInitializer(ConstantAggregateZero::get(
+                        ArrayType::get(IntegerType::getDoubleTy(MilaContext),
+                                       i->second.en - i->second.st + 1)));
+            }
+            a.glob = glb;
+            GlobNamedValues[i->first] = a;
+            /*AllocaInst *Alloca = CreateEntryBlockAllocaInt(MainFunction, i->first, MilaContext);
+            Value *StartVal;
+            if (i->second.exp) {
+                StartVal = i->second.exp->codegen(MilaContext, MilaBuilder, MilaModule);
+            } else {
+                StartVal = ConstantInt::get(MilaContext, APInt(32, i->second.int_val));
+            }
+            MilaBuilder.CreateStore(StartVal, Alloca);
+            NamedValues[i->first] = Alloca;
+        } else {
+            AllocaInst *Alloca = CreateEntryBlockAllocaDouble(MainFunction, i->first, MilaContext);
+            Value *StartVal;
+            if (i->second.exp) {
+                StartVal = i->second.exp->codegen(MilaContext, MilaBuilder, MilaModule);
+            } else {
+                StartVal = ConstantFP::get(MilaContext, APFloat(i->second.float_val));
+            }
+            MilaBuilder.CreateStore(StartVal, Alloca);
+            NamedValues[i->first] = Alloca;
+        }*/
+
+        }
     }
 
     std::map<std::string, Variable> vars_and_const;

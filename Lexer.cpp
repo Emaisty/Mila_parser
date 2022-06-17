@@ -45,7 +45,12 @@ const struct {
         {"else",    tok_else},
         {"while",   tok_while},
         {"do",      tok_do},
-        {"int",     tok_int}
+        {"int",     tok_int},
+        {"of",      tok_of},
+        {"array",   tok_array},
+        {"to",      tok_to},
+        {"downto",  tok_downto},
+        {"for",     tok_for}
 };
 
 

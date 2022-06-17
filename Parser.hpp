@@ -40,7 +40,11 @@ private:
 
     ExpAST *write();
 
-    VarAST *readln();
+    ExpAST *readln();
+
+    int read_int();
+
+    ExpAST *read_var();
 
     void vars();
 
@@ -60,11 +64,11 @@ private:
 
     ExpAST *full_expression();
 
-    ExpAST *full_expression_prime(ExpAST* a);
+    ExpAST *full_expression_prime(ExpAST *a);
 
     ExpAST *full_term();
 
-    ExpAST *full_term_prime(ExpAST* a);
+    ExpAST *full_term_prime(ExpAST *a);
 
     ExpAST *full_faktor();
 
