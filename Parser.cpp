@@ -26,16 +26,32 @@ ExpAST *Parser::read_var() {
     VarAST var;
     var.name = m_Lexer.identifierStr();
     cur_tok = getNextToken();
-    if (cur_tok == tok_opsqbrak) {
-        ArrayElAST ar;
-        ar.name = var.name;
-        cur_tok = getNextToken();
-        ar.num = full_expression();
-        match(tok_clsqbrak);
-        cur_tok = getNextToken();
-        return ar.clone();
-    } else
-        return var.clone();
+    switch (cur_tok) {
+        case tok_opsqbrak: {
+            ArrayElAST ar;
+            ar.name = var.name;
+            cur_tok = getNextToken();
+            ar.num = full_expression();
+            match(tok_clsqbrak);
+            cur_tok = getNextToken();
+            return ar.clone();
+        }
+        case tok_opbrak: {
+            FuncCallAST func;
+            func.prot.Name = var.name;
+            cur_tok = getNextToken();
+            func.exp.push_back(full_expression());
+            while (cur_tok == tok_comma) {
+                cur_tok = getNextToken();
+                func.exp.push_back(full_expression());
+            }
+            match(tok_clbrak);
+            cur_tok = getNextToken();
+            return func.clone();
+        }
+        default:
+            return var.clone();
+    }
 }
 
 void Parser::start_of_prog() {
@@ -49,7 +65,7 @@ void Parser::start_of_prog() {
 }
 
 void Parser::vars() {
-    std::vector<std::string> names;
+    std::vector <std::string> names;
     match(tok_identifier);
     names.push_back(m_Lexer.identifierStr());
     cur_tok = getNextToken();
@@ -389,8 +405,8 @@ void Parser::vars_and_const() {
     }
 }
 
-std::vector<std::string> arg_ord;
-std::map<std::string, Variable> arg_;
+std::vector <std::string> arg_ord;
+std::map <std::string, Variable> arg_;
 
 void Parser::arg() {
     std::string name;
@@ -438,7 +454,7 @@ void Parser::arg() {
                         break;
                     }
                     default: {
-                        std::cout << "Handn't done array of array or unknown type";
+                        std::cout << "Hadn't done array of array or unknown type";
                         throw "";
                     }
                 }
@@ -450,7 +466,7 @@ void Parser::arg() {
             }
         }
         cur_tok = getNextToken();
-        while (cur_tok == tok_comma) {
+        while (cur_tok == tok_semicolon) {
             cur_tok = getNextToken();
             match(tok_identifier);
             name = m_Lexer.identifierStr();
@@ -590,6 +606,7 @@ Funct *Parser::func() {
             vars_and_const();
             p.Vars = var;
             f.Body = command();
+            var.clear();
         } else {
 
         }
@@ -600,33 +617,10 @@ Funct *Parser::func() {
     return res.clone();
 }
 
-FuncCallAST *Parser::call_func() {
-    FuncCallAST func;
-    func.prot.Name = m_Lexer.identifierStr();
-    cur_tok = getNextToken();
-    if (cur_tok != tok_opbrak)
-        return nullptr;
-    cur_tok = getNextToken();
-    func.exp.push_back(full_expression());
-    while (cur_tok == tok_comma) {
-        cur_tok = getNextToken();
-        func.exp.push_back(full_expression());
-    }
-    match(tok_clbrak);
-    cur_tok = getNextToken();
-    return func.clone();
-}
-
 
 ExpAST *Parser::faktor() {
     switch (cur_tok) {
         case tok_identifier: {
-            for (int i = 0; i < functions.size(); ++i)
-                if (functions[i] == m_Lexer.identifierStr()) {
-                    FuncCallAST *a = call_func();
-                    if (a)
-                        return a;
-                }
             return read_var();
         }
         case tok_number_int: {
@@ -1023,14 +1017,23 @@ ComandAST *Parser::command() {
             ComandAST *cmd;
             cmd = command();
             block.commands.push_back(cmd);
-            while (cmd = command())
+            cmd = command();
+            while (cmd) {
                 block.commands.push_back(cmd);
-
+                cmd = command();
+            }
             match(tok_end);
             cur_tok = getNextToken();
             match(tok_semicolon);
             cur_tok = getNextToken();
             return block.clone();
+        }
+        case tok_exit: {
+            ExitAST ex;
+            cur_tok = getNextToken();
+            match(tok_semicolon);
+            cur_tok = getNextToken();
+            return ex.clone();
         }
         default:
             return nullptr;
@@ -1058,6 +1061,8 @@ Prog *Parser::body() {
     while (cmd = command())
         main.commands.push_back(cmd);
     match(tok_end);
+    cur_tok = getNextToken();
+    match(tok_dot);
     return main.clone();
 
 }
@@ -1181,18 +1186,19 @@ const llvm::Module &Parser::Generate() {
 
     // create main function
     {
+
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), false);
         llvm::Function *MainFunction = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "main", MilaModule);
-
+        cur_func = MainFunction;
         // block
         llvm::BasicBlock *BB = llvm::BasicBlock::Create(MilaContext, "entry", MainFunction);
         MilaBuilder.SetInsertPoint(BB);
 
 
         program->codegen(MilaContext, MilaBuilder, MilaModule);
-
         // return 0
         MilaBuilder.CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(MilaContext), 0));
+        cur_func = nullptr;
 
     }
 
@@ -1207,6 +1213,5 @@ const llvm::Module &Parser::Generate() {
  * Every function in the parser will assume that CurTok is the cureent token that needs to be parsed
  */
 Token Parser::getNextToken() {
-    std::cout << cur_tok << std::endl;
     return m_Lexer.gettok();
 }

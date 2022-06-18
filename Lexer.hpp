@@ -34,10 +34,10 @@ enum Token {
     tok_integer, //17
     tok_double,
     tok_for,
-    tok_do,
+    tok_do,    //20
 
     // 2-character operators
-    tok_notequal,
+    tok_notequal,   //21
     tok_lessequal,
     tok_greaterequal,
     tok_assign,
@@ -66,7 +66,7 @@ enum Token {
 
     //spes symbols
 
-    tok_colon,
+    tok_colon,      //37
     tok_semicolon,   //38
 
     //math operators

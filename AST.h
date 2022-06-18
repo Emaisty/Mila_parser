@@ -46,6 +46,10 @@ static std::map<std::string, Alloc> NamedValues;
 
 static std::map<std::string, Glob> GlobNamedValues;
 
+static std::string GlobName = "";
+
+static Function *cur_func;
+
 static AllocaInst *CreateEntryBlockAllocaInt(Function *TheFunction, StringRef VarName, llvm::LLVMContext &MilaContext) {
     IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
     return TmpB.CreateAlloca(Type::getInt32Ty(MilaContext), nullptr, VarName);
@@ -168,7 +172,8 @@ public:
         TheFunction = Proto->codegen(MilaContext, MilaBuilder, MilaModule);
         BasicBlock *BB = BasicBlock::Create(MilaContext, "entry" + Proto->Name, TheFunction);
         MilaBuilder.SetInsertPoint(BB);
-
+        GlobName = Proto->Name;
+        cur_func = TheFunction;
         //arg
         int i = 0;
         for (auto &Arg: TheFunction->args()) {
@@ -194,26 +199,70 @@ public:
         }
         {
             AllocaInst *Alloca;
-            if (Proto->Args[Proto->Name].type == Variable::integer)
+            if (Proto->Args[Proto->Name].type == Variable::integer) {
                 Alloca = CreateEntryBlockAllocaInt(TheFunction, Proto->Name, MilaContext);
-            if (Proto->Args[Proto->Name].type == Variable::float_number)
+                MilaBuilder.CreateStore(ConstantInt::get(Type::getInt32Ty(MilaContext), APInt(32, 0)), Alloca);
+            }
+            if (Proto->Args[Proto->Name].type == Variable::float_number) {
                 Alloca = CreateEntryBlockAllocaDouble(TheFunction, Proto->Name, MilaContext);
-            if (Proto->Args[Proto->Name].type == Variable::array_int)
+                MilaBuilder.CreateStore(ConstantFP::get(Type::getDoubleTy(MilaContext), APFloat(0.0)), Alloca);
+            }
+            if (Proto->Args[Proto->Name].type == Variable::array_int) {
                 Alloca = CreateEntryBlockAllocaArrayInt(TheFunction, Proto->Name, MilaContext,
                                                         Proto->Args[Proto->Name].en -
                                                         Proto->Args[Proto->Name].st + 1);
-            if (Proto->Args[Proto->Name].type == Variable::array_double)
+                MilaBuilder.CreateStore(ConstantAggregateZero::get(
+                        ArrayType::get(IntegerType::getInt32Ty(MilaContext),
+                                       Proto->Args[Proto->Name].en -
+                                       Proto->Args[Proto->Name].st + 1)), Alloca);
+            }
+            if (Proto->Args[Proto->Name].type == Variable::array_double) {
                 Alloca = CreateEntryBlockAllocaArrayDouble(TheFunction, Proto->Name, MilaContext,
                                                            Proto->Args[Proto->Name].en -
                                                            Proto->Args[Proto->Name].st + 1);
-            MilaBuilder.CreateStore(ConstantInt::get(Type::getInt32Ty(MilaContext), APInt(32, 0)), Alloca);
+                MilaBuilder.CreateStore(ConstantAggregateZero::get(
+                        ArrayType::get(IntegerType::getDoubleTy(MilaContext),
+                                       Proto->Args[Proto->Name].en -
+                                       Proto->Args[Proto->Name].st + 1)), Alloca);
+            }
             Alloc a;
             a.alloca = Alloca;
             NamedValues[Proto->Name] = a;
         }
 
         //vars
-
+        for (auto i: Proto->Vars) {
+            AllocaInst *Alloca;
+            if (i.second.type == Variable::integer) {
+                Alloca = CreateEntryBlockAllocaInt(TheFunction, i.first, MilaContext);
+                MilaBuilder.CreateStore(ConstantInt::get(Type::getInt32Ty(MilaContext), APInt(32, 0)), Alloca);
+            }
+            if (i.second.type == Variable::float_number) {
+                Alloca = CreateEntryBlockAllocaDouble(TheFunction, i.first, MilaContext);
+                MilaBuilder.CreateStore(ConstantFP::get(Type::getDoubleTy(MilaContext), APFloat(0.0)), Alloca);
+            }
+            if (i.second.type == Variable::array_int) {
+                Alloca = CreateEntryBlockAllocaArrayInt(TheFunction, i.first, MilaContext,
+                                                        i.second.en -
+                                                        i.second.st + 1);
+                MilaBuilder.CreateStore(ConstantAggregateZero::get(
+                        ArrayType::get(IntegerType::getInt32Ty(MilaContext),
+                                       i.second.en -
+                                       i.second.st + 1)), Alloca);
+            }
+            if (i.second.type == Variable::array_double) {
+                Alloca = CreateEntryBlockAllocaArrayDouble(TheFunction, i.first, MilaContext,
+                                                           i.second.en -
+                                                           i.second.st + 1);
+                MilaBuilder.CreateStore(ConstantAggregateZero::get(
+                        ArrayType::get(IntegerType::getDoubleTy(MilaContext),
+                                       i.second.en -
+                                       i.second.st + 1)), Alloca);
+            }
+            Alloc a;
+            a.alloca = Alloca;
+            NamedValues[i.first] = a;
+        }
 
 
         Body->codegen(MilaContext, MilaBuilder, MilaModule);
@@ -222,6 +271,8 @@ public:
                                                      NamedValues[Proto->Name].alloca));
 
         NamedValues.clear();
+        GlobName = "";
+        cur_func = nullptr;
         return TheFunction;
     }
 };
@@ -237,9 +288,10 @@ public:
         for (int i = 0; i < exp.size(); ++i) {
             arg.push_back(exp[i]->codegen(MilaContext, MilaBuilder, MilaModule));
         }
-        return MilaBuilder.CreateCall(MilaModule.getFunction(prot.Name), {
+        Value *res = MilaBuilder.CreateCall(MilaModule.getFunction(prot.Name), {
                 arg
         });
+        return res;
     }
 
     std::vector<ExpAST *> exp;
@@ -340,11 +392,16 @@ public:
 
     Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
         GlobalValue *B = GlobNamedValues[name].glob;
+        AllocaInst *A = NamedValues[name].alloca;
         Value *a = MilaBuilder.CreateSub(num->codegen(MilaContext, MilaBuilder, MilaModule),
                                          ConstantInt::get(MilaContext, APInt(32, GlobNamedValues[name].st)));
         Value *i32zero = ConstantInt::get(MilaContext, APInt(32, 0));
         Value *indices[2] = {i32zero, a};
-        auto i = MilaBuilder.CreateInBoundsGEP(B, ArrayRef<Value *>(indices, 2));
+        Value *i;
+        if (B)
+            i = MilaBuilder.CreateInBoundsGEP(B, ArrayRef<Value *>(indices, 2));
+        else
+            i = MilaBuilder.CreateInBoundsGEP(A, ArrayRef<Value *>(indices, 2));
         return MilaBuilder.CreateLoad(i->getType()->getPointerElementType(), i, name.c_str());
     }
 
@@ -379,13 +436,18 @@ public:
                     return MilaBuilder.CreateUDiv(L, R, "divtmp");
                 case 'm':
                     return MilaBuilder.CreateURem(L, R, "modtmp");
-                    /*case '&':
-                        L = MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
-                        return MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
-                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
-                    case '|':
-                        L = MilaBuilder.CreateLogicalOr(L, R, "ortmp");
-                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);*/
+                case '&': {
+                    Value *v = MilaBuilder.CreateMul(L, R, "multmp");
+                    v = MilaBuilder.CreateICmpNE(v, ConstantInt::get(Type::getInt32Ty(MilaContext), APInt(32, 0)),
+                                                 "noteq");
+                    return MilaBuilder.CreateIntCast(v, Type::getInt32Ty(MilaContext), false);
+                }
+                case '|': {
+                    Value *v = MilaBuilder.CreateAdd(L, R, "multmp");
+                    v = MilaBuilder.CreateICmpNE(v, ConstantInt::get(Type::getInt32Ty(MilaContext), APInt(32, 0)),
+                                                 "noteq");
+                    return MilaBuilder.CreateIntCast(v, Type::getInt32Ty(MilaContext), false);
+                }
                 case '>':
                     switch (adop) {
                         case '=':
@@ -434,36 +496,41 @@ public:
                     return MilaBuilder.CreateFDiv(L, R, "divtmp");
                 case 'm':
                     return MilaBuilder.CreateFRem(L, R, "modtmp");
-                    /*case '&':
-                        L = MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
-                        return MilaBuilder.CreateLogicalAnd(L, R, "andtmp");
-                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
-                    case '|':
-                        L = MilaBuilder.CreateLogicalOr(L, R, "ortmp");
-                        return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);*/
+                case '&': {
+                    Value *v = MilaBuilder.CreateFMul(L, R, "multmp");
+                    v = MilaBuilder.CreateFCmpONE(v, ConstantFP::get(Type::getDoubleTy(MilaContext), APFloat(0.0)),
+                                                  "noteq");
+                    return MilaBuilder.CreateIntCast(v, Type::getInt32Ty(MilaContext), false);
+                }
+                case '|': {
+                    Value *v = MilaBuilder.CreateFAdd(L, R, "multmp");
+                    v = MilaBuilder.CreateFCmpONE(v, ConstantFP::get(Type::getDoubleTy(MilaContext), APFloat(0.0)),
+                                                  "noteq");
+                    return MilaBuilder.CreateIntCast(v, Type::getInt32Ty(MilaContext), false);
+                }
                 case '>':
                     switch (adop) {
                         case '=':
-                            L = MilaBuilder.CreateICmpSGT(L, R, "getmp");
+                            L = MilaBuilder.CreateFCmpOGE(L, R, "getmp");
                             return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
                         default:
-                            L = MilaBuilder.CreateICmpSGT(L, R, "gttmp");
+                            L = MilaBuilder.CreateFCmpOGT(L, R, "gttmp");
                             return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
                     }
                 case '<':
                     switch (adop) {
                         case '=':
-                            L = MilaBuilder.CreateICmpSLE(L, R, "letmp");
+                            L = MilaBuilder.CreateFCmpOLE(L, R, "letmp");
                             return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
                         default:
-                            L = MilaBuilder.CreateICmpSLT(L, R, "lttmp");
+                            L = MilaBuilder.CreateFCmpOLT(L, R, "lttmp");
                             return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
                     }
                 case '=':
-                    L = MilaBuilder.CreateICmpEQ(L, R, "eqtmp");
+                    L = MilaBuilder.CreateFCmpOEQ(L, R, "eqtmp");
                     return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
                 case '!':
-                    L = MilaBuilder.CreateICmpNE(L, R, "netmp");
+                    L = MilaBuilder.CreateFCmpONE(L, R, "netmp");
                     return MilaBuilder.CreateIntCast(L, Type::getInt32Ty(MilaContext), false);
 
             }
@@ -550,7 +617,10 @@ public:
 
         MilaBuilder.SetInsertPoint(CondBB);
         Value *Val = exp->codegen(MilaContext, MilaBuilder, MilaModule);
-        Val = MilaBuilder.CreateICmpNE(Val, ConstantInt::get(MilaContext, APInt(32, 0)), "whilecond");
+        if (Val->getType()->isIntegerTy())
+            Val = MilaBuilder.CreateICmpNE(Val, ConstantInt::get(MilaContext, APInt(32, 0)), "whilecond");
+        else
+            Val = MilaBuilder.CreateFCmpONE(Val, ConstantFP::get(MilaContext, APFloat(0.0)), "whilecond");
 
         MilaBuilder.CreateCondBr(Val, BodyBB, ExitBB);
 
@@ -580,6 +650,27 @@ public:
     }
 
     std::vector<ComandAST *> commands;
+};
+
+class ExitAST : public ComandAST {
+public:
+    ExitAST *clone() const override {
+        return new ExitAST(*this);
+    }
+
+    void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
+        if (GlobName != "")
+            MilaBuilder.CreateRet(MilaBuilder.CreateLoad(NamedValues[GlobName].alloca->getAllocatedType(),
+                                                         NamedValues[GlobName].alloca));
+        else
+            MilaBuilder.CreateRet(ConstantInt::get(Type::getInt32Ty(MilaContext), APInt(32, 0)));
+
+        BasicBlock *after = BasicBlock::Create(MilaContext, "afterret");
+        cur_func->getBasicBlockList().push_back(after);
+        MilaBuilder.SetInsertPoint(after);
+
+
+    }
 };
 
 //assign operator
@@ -657,7 +748,11 @@ public:
 
     void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
         Value *Val = exp->codegen(MilaContext, MilaBuilder, MilaModule);
-        Val = MilaBuilder.CreateICmpNE(Val, ConstantInt::get(MilaContext, APInt(32, 0)), "ifcond");
+        if (Val->getType()->isIntegerTy()) {
+            Val = MilaBuilder.CreateICmpNE(Val, ConstantInt::get(MilaContext, APInt(32, 0)), "ifcond");
+        } else {
+            Val = MilaBuilder.CreateFCmpONE(Val, ConstantFP::get(MilaContext, APFloat(0.0)), "ifcond");
+        }
 
         Function *TheFunction = MilaBuilder.GetInsertBlock()->getParent();
 
@@ -726,7 +821,17 @@ public:
         MilaBuilder.CreateBr(CondBB);
         MilaBuilder.SetInsertPoint(CondBB);
         Value *r, *L, *all;
-
+        L = assign->var->codegen(MilaContext, MilaBuilder, MilaModule);
+        if (L->getType()->isIntegerTy() && res->getType()->isDoubleTy()) {
+            IntCastCallAST i;
+            i.exp = exp;
+            res = i.exp->codegen(MilaContext, MilaBuilder, MilaModule);
+        }
+        if (L->getType()->isDoubleTy() && res->getType()->isIntegerTy()) {
+            DoubleCastCallAST i;
+            i.exp = exp;
+            res = i.exp->codegen(MilaContext, MilaBuilder, MilaModule);
+        }
         if (var) {
             Value *L1 = NamedValues[var->name].alloca, *L2 = GlobNamedValues[var->name].glob;
             if (L1)
@@ -736,8 +841,10 @@ public:
         } else {
 
         }
-        L = var->codegen(MilaContext, MilaBuilder, MilaModule);
-        r = MilaBuilder.CreateICmpEQ(L, res, "eqtmp");
+        if (L->getType()->isIntegerTy())
+            r = MilaBuilder.CreateICmpEQ(L, res, "eqtmp");
+        else
+            r = MilaBuilder.CreateFCmpOEQ(L, res, "eqtmp");
         MilaBuilder.CreateCondBr(r, ExitBB, BodyBB);
 
         TheFunction->getBasicBlockList().push_back(BodyBB);

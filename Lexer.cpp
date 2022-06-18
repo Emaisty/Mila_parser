@@ -15,7 +15,7 @@ InputCharType Lexer::type_of_char() {
     else if (cur_symb == EOF || cur_symb == 0)
         return END;
     else if ((cur_symb >= ':' && cur_symb <= '?') || (cur_symb >= '\'' && cur_symb <= '.') || cur_symb == '$' ||
-             cur_symb == '&' || (cur_symb >= '[' && cur_symb <= ']'))
+             cur_symb == '&' || (cur_symb >= '[' && cur_symb <= '_'))
         return SPE_SYMB;
     else if (cur_symb <= ' ')
         return WHITE_SPACE;
@@ -53,13 +53,16 @@ const struct {
         {"for",       tok_for},
         {"dec",       tok_dec},
         {"procedure", tok_procedure},
-        {"function",  tok_function}
+        {"function",  tok_function},
+        {"and",       tok_and},
+        {"or",        tok_or},
+        {"exit",      tok_exit}
 };
 
 
 Token Lexer::readString() {
     std::string str;
-    while (type_of_char() == LETTER || type_of_char() == NUMBER) {
+    while (type_of_char() == LETTER || type_of_char() == NUMBER || (type_of_char() == SPE_SYMB && cur_symb == '_')) {
         str += (char) cur_symb;
         cur_symb = readSymbol();
     }
