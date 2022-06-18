@@ -30,6 +30,18 @@ int readfln(double *x) {
     return 0;
 }
 
+int writec(int a) {
+    char c = a;
+    printf("%c", c);
+    return 0;
+}
+
+int writecln(int a) {
+    char c = a;
+    printf("%c\n", c);
+    return 0;
+}
+
 int double_to_int(double a) {
     return a;
 }

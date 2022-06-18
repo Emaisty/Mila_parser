@@ -14,7 +14,7 @@ InputCharType Lexer::type_of_char() {
         return NUMBER;
     else if (cur_symb == EOF || cur_symb == 0)
         return END;
-    else if ((cur_symb >= ':' && cur_symb <= '?') || (cur_symb >= '(' && cur_symb <= '.') || cur_symb == '$' ||
+    else if ((cur_symb >= ':' && cur_symb <= '?') || (cur_symb >= '\'' && cur_symb <= '.') || cur_symb == '$' ||
              cur_symb == '&' || (cur_symb >= '[' && cur_symb <= ']'))
         return SPE_SYMB;
     else if (cur_symb <= ' ')
@@ -50,7 +50,8 @@ const struct {
         {"array",   tok_array},
         {"to",      tok_to},
         {"downto",  tok_downto},
-        {"for",     tok_for}
+        {"for",     tok_for},
+        {"dec",     tok_dec}
 };
 
 
@@ -200,6 +201,16 @@ Token Lexer::readSpe() {
             return tok_opbrak;
         case ')':
             return tok_clbrak;
+        case '\'': {
+            std::string str;
+            while (cur_symb != '\'') {
+                str.push_back(cur_symb);
+                cur_symb = readSymbol();
+            }
+            cur_symb = readSymbol();
+            m_IdentifierStr = str;
+            return tok_string;
+        }
         default:
             throw "Error. Unknown symbol";
 

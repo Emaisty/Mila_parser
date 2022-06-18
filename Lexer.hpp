@@ -91,7 +91,9 @@ enum Token {
     tok_write,
     tok_int,
     tok_float,
-    tok_of
+    tok_of,
+    tok_dec,
+    tok_string
 
 };
 

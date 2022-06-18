@@ -421,6 +421,24 @@ ExpAST *Parser::faktor() {
             unar.op = '-';
             return unar.clone();
         }
+        case tok_int: {
+            cur_tok = getNextToken();
+            IntCastCallAST i;
+            i.exp = full_expression();
+            return i.clone();
+        }
+        case tok_double: {
+            cur_tok = getNextToken();
+            DoubleCastCallAST i;
+            i.exp = full_expression();
+            return i.clone();
+        }
+        case tok_string: {
+            StringAST st;
+            st.str = m_Lexer.identifierStr();
+            cur_tok = getNextToken();
+            return st.clone();
+        }
         default:
             std::cout << "unknown command\n";
             throw "not match " + cur_tok;
@@ -701,6 +719,18 @@ ComandAST *Parser::command() {
             cur_tok = getNextToken();
             return read.clone();
         }
+        case tok_dec: {
+            cur_tok = getNextToken();
+            DecAST dec;
+            match(tok_opbrak);
+            cur_tok = getNextToken();
+            dec.var = read_var();
+            match(tok_clbrak);
+            cur_tok = getNextToken();
+            match(tok_semicolon);
+            cur_tok = getNextToken();
+            return dec.clone();
+        }
         case tok_if: {
             cur_tok = getNextToken();
             IfAST stat;
@@ -818,6 +848,24 @@ void Parser::InitLexan(char *name_of_file) {
 }
 
 const llvm::Module &Parser::Generate() {
+
+    // create writecln function
+    {
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
+        llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writecln", MilaModule);
+        for (auto &Arg: F->args())
+            Arg.setName("x");
+    }
+
+    // create writec function
+    {
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
+        llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writec", MilaModule);
+        for (auto &Arg: F->args())
+            Arg.setName("x");
+    }
 
     // create writeln function
     {
