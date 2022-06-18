@@ -77,7 +77,7 @@ enum Token {
     //wtf
     tok_dot,
     tok_comma,
-    tok_opbrak,
+    tok_opbrak,   //44
     tok_clbrak,   //45
     tok_opfigbrak,
     tok_clfigbrak,

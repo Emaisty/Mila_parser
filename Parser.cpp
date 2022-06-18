@@ -65,7 +65,7 @@ void Parser::start_of_prog() {
 }
 
 void Parser::vars() {
-    std::vector <std::string> names;
+    std::vector<std::string> names;
     match(tok_identifier);
     names.push_back(m_Lexer.identifierStr());
     cur_tok = getNextToken();
@@ -405,8 +405,8 @@ void Parser::vars_and_const() {
     }
 }
 
-std::vector <std::string> arg_ord;
-std::map <std::string, Variable> arg_;
+std::vector<std::string> arg_ord;
+std::map<std::string, Variable> arg_;
 
 void Parser::arg() {
     std::string name;
@@ -608,7 +608,26 @@ Funct *Parser::func() {
             f.Body = command();
             var.clear();
         } else {
-
+            cur_tok = getNextToken();
+            match(tok_identifier);
+            p.Name = m_Lexer.identifierStr();
+            procedures.push_back(p.Name);
+            cur_tok = getNextToken();
+            match(tok_opbrak);
+            cur_tok = getNextToken();
+            arg();
+            match(tok_clbrak);
+            cur_tok = getNextToken();
+            p.Args_order = arg_ord;
+            p.Args = arg_;
+            arg_ord.clear();
+            arg_.clear();
+            match(tok_semicolon);
+            cur_tok = getNextToken();
+            vars_and_const();
+            p.Vars = var;
+            f.Body = command();
+            var.clear();
         }
         f.Proto = p.clone();
         res.func.push_back(f.clone());
@@ -914,6 +933,25 @@ ExpAST *Parser::readln() {
 ComandAST *Parser::command() {
     switch (cur_tok) {
         case tok_identifier: {
+            for (int i = 0; i < procedures.size(); ++i)
+                if (m_Lexer.identifierStr() == procedures[i]) {
+                    ProcCallAST proc;
+                    proc.prot.Name = m_Lexer.identifierStr();
+                    cur_tok = getNextToken();
+                    match(tok_opbrak);
+                    cur_tok = getNextToken();
+                    proc.exp.push_back(full_expression());
+                    while (cur_tok == tok_comma) {
+                        cur_tok = getNextToken();
+                        proc.exp.push_back(full_expression());
+                    }
+                    match(tok_clbrak);
+                    cur_tok = getNextToken();
+                    match(tok_semicolon);
+                    cur_tok = getNextToken();
+                    return proc.clone();
+                }
+
             ExpAST *id = read_var();
             match(tok_assign);
             cur_tok = getNextToken();

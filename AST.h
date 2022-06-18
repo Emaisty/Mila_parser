@@ -117,19 +117,24 @@ public:
 
     Function *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) {
         Type *res;
-        if (Args[Name].type == Variable::integer)
-            res = Type::getInt32Ty(MilaContext);
+        if (Args.find(Name) != Args.end()) {
+            if (Args[Name].type == Variable::integer)
+                res = Type::getInt32Ty(MilaContext);
 
-        if (Args[Name].type == Variable::float_number)
-            res = Type::getDoubleTy(MilaContext);
+            if (Args[Name].type == Variable::float_number)
+                res = Type::getDoubleTy(MilaContext);
 
-        if (Args[Name].type == Variable::array_int)
-            res = ArrayType::get(IntegerType::getInt32Ty(MilaContext),
-                                 Args[Name].en - Args[Name].st + 1);
+            if (Args[Name].type == Variable::array_int)
+                res = ArrayType::get(IntegerType::getInt32Ty(MilaContext),
+                                     Args[Name].en - Args[Name].st + 1);
 
-        if (Args[Name].type == Variable::array_double)
-            res = ArrayType::get(IntegerType::getDoubleTy(MilaContext),
-                                 Args[Name].en - Args[Name].st + 1);
+            if (Args[Name].type == Variable::array_double)
+                res = ArrayType::get(IntegerType::getDoubleTy(MilaContext),
+                                     Args[Name].en - Args[Name].st + 1);
+        } else {
+            res = Type::getVoidTy(MilaContext);
+
+        }
 
 
         std::vector<Type *> arg;
@@ -197,37 +202,40 @@ public:
             NamedValues[Proto->Args_order[i]] = a;
             i++;
         }
+
         {
             AllocaInst *Alloca;
-            if (Proto->Args[Proto->Name].type == Variable::integer) {
-                Alloca = CreateEntryBlockAllocaInt(TheFunction, Proto->Name, MilaContext);
-                MilaBuilder.CreateStore(ConstantInt::get(Type::getInt32Ty(MilaContext), APInt(32, 0)), Alloca);
+            if (Proto->Args.find(Proto->Name) != Proto->Args.end()) {
+                if (Proto->Args[Proto->Name].type == Variable::integer) {
+                    Alloca = CreateEntryBlockAllocaInt(TheFunction, Proto->Name, MilaContext);
+                    MilaBuilder.CreateStore(ConstantInt::get(Type::getInt32Ty(MilaContext), APInt(32, 0)), Alloca);
+                }
+                if (Proto->Args[Proto->Name].type == Variable::float_number) {
+                    Alloca = CreateEntryBlockAllocaDouble(TheFunction, Proto->Name, MilaContext);
+                    MilaBuilder.CreateStore(ConstantFP::get(Type::getDoubleTy(MilaContext), APFloat(0.0)), Alloca);
+                }
+                if (Proto->Args[Proto->Name].type == Variable::array_int) {
+                    Alloca = CreateEntryBlockAllocaArrayInt(TheFunction, Proto->Name, MilaContext,
+                                                            Proto->Args[Proto->Name].en -
+                                                            Proto->Args[Proto->Name].st + 1);
+                    MilaBuilder.CreateStore(ConstantAggregateZero::get(
+                            ArrayType::get(IntegerType::getInt32Ty(MilaContext),
+                                           Proto->Args[Proto->Name].en -
+                                           Proto->Args[Proto->Name].st + 1)), Alloca);
+                }
+                if (Proto->Args[Proto->Name].type == Variable::array_double) {
+                    Alloca = CreateEntryBlockAllocaArrayDouble(TheFunction, Proto->Name, MilaContext,
+                                                               Proto->Args[Proto->Name].en -
+                                                               Proto->Args[Proto->Name].st + 1);
+                    MilaBuilder.CreateStore(ConstantAggregateZero::get(
+                            ArrayType::get(IntegerType::getDoubleTy(MilaContext),
+                                           Proto->Args[Proto->Name].en -
+                                           Proto->Args[Proto->Name].st + 1)), Alloca);
+                }
+                Alloc a;
+                a.alloca = Alloca;
+                NamedValues[Proto->Name] = a;
             }
-            if (Proto->Args[Proto->Name].type == Variable::float_number) {
-                Alloca = CreateEntryBlockAllocaDouble(TheFunction, Proto->Name, MilaContext);
-                MilaBuilder.CreateStore(ConstantFP::get(Type::getDoubleTy(MilaContext), APFloat(0.0)), Alloca);
-            }
-            if (Proto->Args[Proto->Name].type == Variable::array_int) {
-                Alloca = CreateEntryBlockAllocaArrayInt(TheFunction, Proto->Name, MilaContext,
-                                                        Proto->Args[Proto->Name].en -
-                                                        Proto->Args[Proto->Name].st + 1);
-                MilaBuilder.CreateStore(ConstantAggregateZero::get(
-                        ArrayType::get(IntegerType::getInt32Ty(MilaContext),
-                                       Proto->Args[Proto->Name].en -
-                                       Proto->Args[Proto->Name].st + 1)), Alloca);
-            }
-            if (Proto->Args[Proto->Name].type == Variable::array_double) {
-                Alloca = CreateEntryBlockAllocaArrayDouble(TheFunction, Proto->Name, MilaContext,
-                                                           Proto->Args[Proto->Name].en -
-                                                           Proto->Args[Proto->Name].st + 1);
-                MilaBuilder.CreateStore(ConstantAggregateZero::get(
-                        ArrayType::get(IntegerType::getDoubleTy(MilaContext),
-                                       Proto->Args[Proto->Name].en -
-                                       Proto->Args[Proto->Name].st + 1)), Alloca);
-            }
-            Alloc a;
-            a.alloca = Alloca;
-            NamedValues[Proto->Name] = a;
         }
 
         //vars
@@ -266,10 +274,11 @@ public:
 
 
         Body->codegen(MilaContext, MilaBuilder, MilaModule);
-
-        MilaBuilder.CreateRet(MilaBuilder.CreateLoad(NamedValues[Proto->Name].alloca->getAllocatedType(),
-                                                     NamedValues[Proto->Name].alloca));
-
+        if (Proto->Args.find(Proto->Name) != Proto->Args.end())
+            MilaBuilder.CreateRet(MilaBuilder.CreateLoad(NamedValues[Proto->Name].alloca->getAllocatedType(),
+                                                         NamedValues[Proto->Name].alloca));
+        else
+            MilaBuilder.CreateRet(nullptr);
         NamedValues.clear();
         GlobName = "";
         cur_func = nullptr;
@@ -659,10 +668,13 @@ public:
     }
 
     void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
-        if (GlobName != "")
-            MilaBuilder.CreateRet(MilaBuilder.CreateLoad(NamedValues[GlobName].alloca->getAllocatedType(),
-                                                         NamedValues[GlobName].alloca));
-        else
+        if (GlobName != "") {
+            if (cur_func->getReturnType()->isVoidTy())
+                MilaBuilder.CreateRet(nullptr);
+            else
+                MilaBuilder.CreateRet(MilaBuilder.CreateLoad(NamedValues[GlobName].alloca->getAllocatedType(),
+                                                             NamedValues[GlobName].alloca));
+        } else
             MilaBuilder.CreateRet(ConstantInt::get(Type::getInt32Ty(MilaContext), APInt(32, 0)));
 
         BasicBlock *after = BasicBlock::Create(MilaContext, "afterret");
@@ -866,6 +878,28 @@ public:
     ComandAST *body;
     ExpAST *exp;
     int dir;
+};
+
+class ProcCallAST : public ComandAST {
+public:
+    ProcCallAST *clone() const override {
+        return new ProcCallAST(*this);
+    }
+
+    void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
+        std::vector<Value *> arg;
+        for (int i = 0; i < exp.size(); ++i) {
+            arg.push_back(exp[i]->codegen(MilaContext, MilaBuilder, MilaModule));
+        }
+        MilaBuilder.CreateCall(MilaModule.getFunction(prot.Name), {
+                arg
+        });
+    }
+
+    std::vector<ExpAST *> exp;
+
+    PrototypeAST prot;
+
 };
 
 class WritelnAST : public ComandAST {
