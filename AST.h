@@ -41,6 +41,7 @@ struct Glob {
     int st, end;
 };
 
+
 static std::map<std::string, Alloc> NamedValues;
 
 static std::map<std::string, Glob> GlobNamedValues;
@@ -56,6 +57,18 @@ CreateEntryBlockAllocaDouble(Function *TheFunction, StringRef VarName, llvm::LLV
     return TmpB.CreateAlloca(Type::getDoubleTy(MilaContext), nullptr, VarName);
 }
 
+static AllocaInst *
+CreateEntryBlockAllocaArrayInt(Function *TheFunction, StringRef VarName, llvm::LLVMContext &MilaContext, int size) {
+    IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+    return TmpB.CreateAlloca(ArrayType::get(Type::getInt32Ty(MilaContext), size), nullptr, VarName);
+}
+
+static AllocaInst *
+CreateEntryBlockAllocaArrayDouble(Function *TheFunction, StringRef VarName, llvm::LLVMContext &MilaContext, int size) {
+    IRBuilder<> TmpB(&TheFunction->getEntryBlock(), TheFunction->getEntryBlock().begin());
+    return TmpB.CreateAlloca(ArrayType::get(Type::getDoubleTy(MilaContext), size), nullptr, VarName);
+}
+
 
 class ExpAST {
 public:
@@ -67,25 +80,149 @@ public:
     codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) = 0;
 };
 
+class ComandAST {
+public:
+    virtual ~ComandAST() {};
+
+    virtual ComandAST *clone() const = 0;
+
+    virtual void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) = 0;
+};
+
+struct Variable {
+    enum Type {
+        integer, float_number, array_int, array_double
+    };
+    Type type;
+    int int_val, st, en;
+    double float_val;
+    bool if_const;
+    ExpAST *exp;
+};
+
 class PrototypeAST {
 public:
     std::string Name;
-    std::vector<std::string> Args;
+    std::map<std::string, Variable> Args;
+    std::vector<std::string> Args_order;
+    std::map<std::string, Variable> Vars;
 
-    Function *
-    codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) {
+    PrototypeAST *clone() const {
+        return new PrototypeAST(*this);
+    }
 
+    Function *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) {
+        Type *res;
+        if (Args[Name].type == Variable::integer)
+            res = Type::getInt32Ty(MilaContext);
+
+        if (Args[Name].type == Variable::float_number)
+            res = Type::getDoubleTy(MilaContext);
+
+        if (Args[Name].type == Variable::array_int)
+            res = ArrayType::get(IntegerType::getInt32Ty(MilaContext),
+                                 Args[Name].en - Args[Name].st + 1);
+
+        if (Args[Name].type == Variable::array_double)
+            res = ArrayType::get(IntegerType::getDoubleTy(MilaContext),
+                                 Args[Name].en - Args[Name].st + 1);
+
+
+        std::vector<Type *> arg;
+        for (int i = 0; i < Args_order.size(); ++i) {
+            if (Args[Args_order[i]].type == Variable::integer)
+                arg.push_back(Type::getInt32Ty(MilaContext));
+
+            if (Args[Args_order[i]].type == Variable::float_number)
+                arg.push_back(Type::getDoubleTy(MilaContext));
+
+            if (Args[Args_order[i]].type == Variable::array_int)
+                arg.push_back(ArrayType::get(IntegerType::getInt32Ty(MilaContext),
+                                             Args[Args_order[i]].en - Args[Args_order[i]].st + 1));
+
+            if (Args[Args_order[i]].type == Variable::array_double)
+                arg.push_back(ArrayType::get(IntegerType::getDoubleTy(MilaContext),
+                                             Args[Args_order[i]].en - Args[Args_order[i]].st + 1));
+        }
+        llvm::FunctionType *FT = llvm::FunctionType::get(res, arg, false);
+        llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, Name, MilaModule);
+        int i = 0;
+        for (auto &Arg: F->args())
+            Arg.setName("st" + Args_order[i++]);
+        return F;
     }
 
 };
 
 class FunctionAST {
 public:
-    std::unique_ptr<PrototypeAST> Proto;
-    std::unique_ptr<ExpAST> Body;
+    PrototypeAST *Proto;
+    ComandAST *Body;
+
+    FunctionAST *clone() const {
+        return new FunctionAST(*this);
+    }
 
     Function *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) {
+        Function *TheFunction = MilaModule.getFunction(Proto->Name);
+        TheFunction = Proto->codegen(MilaContext, MilaBuilder, MilaModule);
+        BasicBlock *BB = BasicBlock::Create(MilaContext, "entry" + Proto->Name, TheFunction);
+        MilaBuilder.SetInsertPoint(BB);
 
+        //arg
+        int i = 0;
+        for (auto &Arg: TheFunction->args()) {
+            Value *val = &Arg;
+            AllocaInst *Alloca;
+            if (Proto->Args[Proto->Args_order[i]].type == Variable::integer)
+                Alloca = CreateEntryBlockAllocaInt(TheFunction, Proto->Args_order[i], MilaContext);
+            if (Proto->Args[Proto->Args_order[i]].type == Variable::float_number)
+                Alloca = CreateEntryBlockAllocaDouble(TheFunction, Proto->Args_order[i], MilaContext);
+            if (Proto->Args[Proto->Args_order[i]].type == Variable::array_int)
+                Alloca = CreateEntryBlockAllocaArrayInt(TheFunction, Proto->Args_order[i], MilaContext,
+                                                        Proto->Args[Proto->Args_order[i]].en -
+                                                        Proto->Args[Proto->Args_order[i]].st + 1);
+            if (Proto->Args[Proto->Args_order[i]].type == Variable::array_double)
+                Alloca = CreateEntryBlockAllocaArrayDouble(TheFunction, Proto->Args_order[i], MilaContext,
+                                                           Proto->Args[Proto->Args_order[i]].en -
+                                                           Proto->Args[Proto->Args_order[i]].st + 1);
+            MilaBuilder.CreateStore(val, Alloca);
+            Alloc a;
+            a.alloca = Alloca;
+            NamedValues[Proto->Args_order[i]] = a;
+            i++;
+        }
+        {
+            AllocaInst *Alloca;
+            if (Proto->Args[Proto->Name].type == Variable::integer)
+                Alloca = CreateEntryBlockAllocaInt(TheFunction, Proto->Name, MilaContext);
+            if (Proto->Args[Proto->Name].type == Variable::float_number)
+                Alloca = CreateEntryBlockAllocaDouble(TheFunction, Proto->Name, MilaContext);
+            if (Proto->Args[Proto->Name].type == Variable::array_int)
+                Alloca = CreateEntryBlockAllocaArrayInt(TheFunction, Proto->Name, MilaContext,
+                                                        Proto->Args[Proto->Name].en -
+                                                        Proto->Args[Proto->Name].st + 1);
+            if (Proto->Args[Proto->Name].type == Variable::array_double)
+                Alloca = CreateEntryBlockAllocaArrayDouble(TheFunction, Proto->Name, MilaContext,
+                                                           Proto->Args[Proto->Name].en -
+                                                           Proto->Args[Proto->Name].st + 1);
+            MilaBuilder.CreateStore(ConstantInt::get(Type::getInt32Ty(MilaContext), APInt(32, 0)), Alloca);
+            Alloc a;
+            a.alloca = Alloca;
+            NamedValues[Proto->Name] = a;
+        }
+
+        //vars
+
+
+
+        Body->codegen(MilaContext, MilaBuilder, MilaModule);
+
+        MilaBuilder.CreateRet(MilaBuilder.CreateLoad(NamedValues[Proto->Name].alloca->getAllocatedType(),
+                                                     NamedValues[Proto->Name].alloca));
+
+        NamedValues.clear();
+        return TheFunction;
     }
 };
 
@@ -96,8 +233,16 @@ public:
     }
 
     Value *codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) override {
-
+        std::vector<Value *> arg;
+        for (int i = 0; i < exp.size(); ++i) {
+            arg.push_back(exp[i]->codegen(MilaContext, MilaBuilder, MilaModule));
+        }
+        return MilaBuilder.CreateCall(MilaModule.getFunction(prot.Name), {
+                arg
+        });
     }
+
+    std::vector<ExpAST *> exp;
 
     PrototypeAST prot;
 
@@ -385,27 +530,8 @@ public:
     std::string str;
 };
 
-
-struct Variable {
-    enum Type {
-        integer, float_number, array_int, array_double
-    };
-    Type type;
-    int int_val, st, en;
-    double float_val;
-    bool if_const;
-    ExpAST *exp;
-};
-
 //command
-class ComandAST {
-public:
-    virtual ~ComandAST() {};
 
-    virtual ComandAST *clone() const = 0;
-
-    virtual void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) = 0;
-};
 
 class WhileAST : public ComandAST {
 public:
@@ -955,10 +1081,29 @@ public:
     std::map<std::string, Variable> vars_and_const;
 };
 
+class Funct {
+public:
+
+    Funct *clone() const {
+        return new Funct(*this);
+    }
+
+    void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) {
+        for (auto &i: func)
+            i->codegen(MilaContext, MilaBuilder, MilaModule);
+
+    }
+
+    std::vector<FunctionAST *> func;
+};
+
 
 class Module_prog {
 public:
-    Module_prog(Vars *new_vars = nullptr, Prog *new_main = nullptr) : vars(new_vars), main(new_main) {}
+    Module_prog(Vars *new_vars = nullptr, Prog *new_main = nullptr, Funct *func = nullptr) : vars(
+            new_vars),
+                                                                                             main(new_main),
+                                                                                             func(func) {}
 
     Module_prog *clone() const {
         return new Module_prog(*this);
@@ -970,7 +1115,7 @@ public:
     }
 
     Vars *vars;
-    //TODO func
+    Funct *func;
     Prog *main;
 
 };

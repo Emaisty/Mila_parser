@@ -18,15 +18,15 @@ enum Token {
     tok_number_double,
 
     // keywords
-    tok_begin,
+    tok_begin,   //4
     tok_end,
     tok_const,
     tok_procedure,
     tok_forward,
-    tok_function,
+    tok_function,   //9
     tok_if,
     tok_then,
-    tok_else,
+    tok_else,       // 12
     tok_program,
     tok_while,
     tok_exit,
@@ -67,7 +67,7 @@ enum Token {
     //spes symbols
 
     tok_colon,
-    tok_semicolon,
+    tok_semicolon,   //38
 
     //math operators
     tok_plus,
@@ -78,7 +78,7 @@ enum Token {
     tok_dot,
     tok_comma,
     tok_opbrak,
-    tok_clbrak,
+    tok_clbrak,   //45
     tok_opfigbrak,
     tok_clfigbrak,
     tok_opsqbrak,

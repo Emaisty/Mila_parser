@@ -62,6 +62,8 @@ private:
 
     void rest_command();
 
+    FuncCallAST *call_func();
+
     ExpAST *full_expression();
 
     ExpAST *full_expression_prime(ExpAST *a);
@@ -82,6 +84,10 @@ private:
 
     ExpAST *faktor();
 
+    Funct *func();
+
+    void arg();
+
     Lexer m_Lexer;                   // lexer is used to read tokens
     Token cur_tok;                      // to keep the current token
 
@@ -93,6 +99,9 @@ private:
 
     //variables
     std::map<std::string, Variable> var;
+
+    //vector names of func
+    std::vector<std::string> functions, procedures;
 
     //var read from line
     std::vector<std::string> line_vars;

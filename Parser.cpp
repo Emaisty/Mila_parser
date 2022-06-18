@@ -389,9 +389,244 @@ void Parser::vars_and_const() {
     }
 }
 
+std::vector<std::string> arg_ord;
+std::map<std::string, Variable> arg_;
+
+void Parser::arg() {
+    std::string name;
+    if (cur_tok == tok_identifier) {
+        name = m_Lexer.identifierStr();
+        cur_tok = getNextToken();
+        match(tok_colon);
+        cur_tok = getNextToken();
+        Variable a;
+        arg_ord.push_back(name);
+        switch (cur_tok) {
+            case tok_integer: {
+                a.type = Variable::integer;
+                arg_.insert(std::make_pair(name, a));
+                break;
+            }
+            case tok_double: {
+                a.type = Variable::float_number;
+                arg_.insert(std::make_pair(name, a));
+                break;
+            }
+            case tok_array: {
+                cur_tok = getNextToken();
+                match(tok_opsqbrak);
+                cur_tok = getNextToken();
+                a.st = read_int();
+                match(tok_dot);
+                cur_tok = getNextToken();
+                match(tok_dot);
+                cur_tok = getNextToken();
+                a.en = read_int();
+                match(tok_clsqbrak);
+                cur_tok = getNextToken();
+                match(tok_of);
+                cur_tok = getNextToken();
+                switch (cur_tok) {
+                    case tok_integer: {
+                        a.type = Variable::integer;
+                        arg_.insert(std::make_pair(name, a));
+                        break;
+                    }
+                    case tok_double: {
+                        a.type = Variable::float_number;
+                        arg_.insert(std::make_pair(name, a));
+                        break;
+                    }
+                    default: {
+                        std::cout << "Handn't done array of array or unknown type";
+                        throw "";
+                    }
+                }
+                break;
+            }
+            default: {
+                std::cout << "wrong type of var" << std::endl;
+                throw "";
+            }
+        }
+        cur_tok = getNextToken();
+        while (cur_tok == tok_comma) {
+            cur_tok = getNextToken();
+            match(tok_identifier);
+            name = m_Lexer.identifierStr();
+            cur_tok = getNextToken();
+            match(tok_colon);
+            cur_tok = getNextToken();
+            Variable a;
+            arg_ord.push_back(name);
+            switch (cur_tok) {
+                case tok_integer: {
+                    a.type = Variable::integer;
+                    arg_.insert(std::make_pair(name, a));
+                    break;
+                }
+                case tok_double: {
+                    a.type = Variable::float_number;
+                    arg_.insert(std::make_pair(name, a));
+                    break;
+                }
+                case tok_array: {
+                    cur_tok = getNextToken();
+                    match(tok_opsqbrak);
+                    cur_tok = getNextToken();
+                    a.st = read_int();
+                    match(tok_dot);
+                    cur_tok = getNextToken();
+                    match(tok_dot);
+                    cur_tok = getNextToken();
+                    a.en = read_int();
+                    match(tok_clsqbrak);
+                    cur_tok = getNextToken();
+                    match(tok_of);
+                    cur_tok = getNextToken();
+                    switch (cur_tok) {
+                        case tok_integer: {
+                            a.type = Variable::integer;
+                            arg_.insert(std::make_pair(name, a));
+                            break;
+                        }
+                        case tok_double: {
+                            a.type = Variable::float_number;
+                            arg_.insert(std::make_pair(name, a));
+                            break;
+                        }
+                        default: {
+                            std::cout << "Handn't done array of array or unknown type";
+                            throw "";
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    std::cout << "wrong type of var" << std::endl;
+                    throw "";
+                }
+            }
+            cur_tok = getNextToken();
+        }
+    }
+}
+
+
+Funct *Parser::func() {
+    Funct res;
+    while (cur_tok == tok_function || cur_tok == tok_procedure) {
+        PrototypeAST p;
+        FunctionAST f;
+        if (cur_tok == tok_function) {
+            cur_tok = getNextToken();
+            match(tok_identifier);
+            p.Name = m_Lexer.identifierStr();
+            functions.push_back(p.Name);
+            cur_tok = getNextToken();
+            match(tok_opbrak);
+            cur_tok = getNextToken();
+            arg();
+            match(tok_clbrak);
+            cur_tok = getNextToken();
+            match(tok_colon);
+            cur_tok = getNextToken();
+            Variable a;
+            switch (cur_tok) {
+                case tok_integer: {
+                    a.type = Variable::integer;
+                    arg_.insert(std::make_pair(p.Name, a));
+                    break;
+                }
+                case tok_double: {
+                    a.type = Variable::float_number;
+                    arg_.insert(std::make_pair(p.Name, a));
+                    break;
+                }
+                case tok_array: {
+                    cur_tok = getNextToken();
+                    match(tok_opsqbrak);
+                    cur_tok = getNextToken();
+                    a.st = read_int();
+                    match(tok_dot);
+                    cur_tok = getNextToken();
+                    match(tok_dot);
+                    cur_tok = getNextToken();
+                    a.en = read_int();
+                    match(tok_clsqbrak);
+                    cur_tok = getNextToken();
+                    match(tok_of);
+                    cur_tok = getNextToken();
+                    switch (cur_tok) {
+                        case tok_integer: {
+                            a.type = Variable::integer;
+                            arg_.insert(std::make_pair(p.Name, a));
+                            break;
+                        }
+                        case tok_double: {
+                            a.type = Variable::float_number;
+                            arg_.insert(std::make_pair(p.Name, a));
+                            break;
+                        }
+                        default: {
+                            std::cout << "Handn't done array of array or unknown type";
+                            throw "";
+                        }
+                    }
+                    break;
+                }
+                default: {
+                    std::cout << "wrong type of var" << std::endl;
+                    throw "";
+                }
+            }
+            p.Args_order = arg_ord;
+            p.Args = arg_;
+            arg_ord.clear();
+            arg_.clear();
+            cur_tok = getNextToken();
+            match(tok_semicolon);
+            cur_tok = getNextToken();
+            vars_and_const();
+            p.Vars = var;
+            f.Body = command();
+        } else {
+
+        }
+        f.Proto = p.clone();
+        res.func.push_back(f.clone());
+    }
+
+    return res.clone();
+}
+
+FuncCallAST *Parser::call_func() {
+    FuncCallAST func;
+    func.prot.Name = m_Lexer.identifierStr();
+    cur_tok = getNextToken();
+    if (cur_tok != tok_opbrak)
+        return nullptr;
+    cur_tok = getNextToken();
+    func.exp.push_back(full_expression());
+    while (cur_tok == tok_comma) {
+        cur_tok = getNextToken();
+        func.exp.push_back(full_expression());
+    }
+    match(tok_clbrak);
+    cur_tok = getNextToken();
+    return func.clone();
+}
+
+
 ExpAST *Parser::faktor() {
     switch (cur_tok) {
         case tok_identifier: {
+            for (int i = 0; i < functions.size(); ++i)
+                if (functions[i] == m_Lexer.identifierStr()) {
+                    FuncCallAST *a = call_func();
+                    if (a)
+                        return a;
+                }
             return read_var();
         }
         case tok_number_int: {
@@ -790,6 +1025,7 @@ ComandAST *Parser::command() {
             block.commands.push_back(cmd);
             while (cmd = command())
                 block.commands.push_back(cmd);
+
             match(tok_end);
             cur_tok = getNextToken();
             match(tok_semicolon);
@@ -828,15 +1064,17 @@ Prog *Parser::body() {
 
 
 Module_prog *Parser::Parse() {
+    Module_prog module;
+    Prog *main;
     cur_tok = getNextToken();
     start_of_prog();
+    module.func = func();
     vars_and_const();
     Vars vars_and_const(var);
-    //TODO func
-    Prog *main;
+
     main = body();
 
-    Module_prog module;
+
     module.vars = vars_and_const.clone();
     module.main = main;
     program = module.clone();
@@ -937,6 +1175,10 @@ const llvm::Module &Parser::Generate() {
             Arg.setName("x");
     }
 
+    program->func->codegen(MilaContext, MilaBuilder, MilaModule);
+
+    program->vars->codegen(MilaContext, MilaBuilder, MilaModule);
+
     // create main function
     {
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), false);
@@ -946,8 +1188,6 @@ const llvm::Module &Parser::Generate() {
         llvm::BasicBlock *BB = llvm::BasicBlock::Create(MilaContext, "entry", MainFunction);
         MilaBuilder.SetInsertPoint(BB);
 
-        // declare variables
-        program->vars->codegen(MilaContext, MilaBuilder, MilaModule);
 
         program->codegen(MilaContext, MilaBuilder, MilaModule);
 
@@ -967,5 +1207,6 @@ const llvm::Module &Parser::Generate() {
  * Every function in the parser will assume that CurTok is the cureent token that needs to be parsed
  */
 Token Parser::getNextToken() {
+    std::cout << cur_tok << std::endl;
     return m_Lexer.gettok();
 }
