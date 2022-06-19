@@ -209,6 +209,8 @@ public:
                 Alloc a;
                 a.alloca = Alloca;
                 NamedValues[Proto->Name] = a;
+                MilaBuilder.CreateStore(ConstantAggregateZero::get(returnType(&Proto->Args[Proto->Name], MilaContext)),
+                                        Alloca);
             }
         }
 
@@ -219,6 +221,8 @@ public:
             Alloc a;
             a.alloca = Alloca;
             NamedValues[i.first] = a;
+            MilaBuilder.CreateStore(ConstantAggregateZero::get(returnType(&i.second, MilaContext)),
+                                    Alloca);
         }
 
 
