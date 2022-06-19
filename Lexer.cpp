@@ -182,18 +182,8 @@ Token Lexer::readSpe() {
                 return tok_greaterequal;
             }
             return tok_greater;
-            /*case '|':
-                if (type_of_char() == SPE_SYMB && cur_symb == '|') {
-                    cur_symb = readSymbol();
-                    return tok_or;
-                }
-                throw "ERROR. Unknown operator.";*/
         case '&':
             return readNumber_oct();
-            /*if (type_of_char() == SPE_SYMB && cur_symb == '&') {
-                cur_symb = readSymbol();
-                return tok_and;
-            }*/
         case '$':
             return readNumber_hex();
         case '!':

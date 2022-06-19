@@ -62,6 +62,8 @@ private:
 
     void rest_command();
 
+    Variable getType();
+
     FuncCallAST *call_func();
 
     ExpAST *full_expression();

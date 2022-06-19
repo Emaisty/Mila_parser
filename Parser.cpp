@@ -31,9 +31,15 @@ ExpAST *Parser::read_var() {
             ArrayElAST ar;
             ar.name = var.name;
             cur_tok = getNextToken();
-            ar.num = full_expression();
+            ar.num.push_back(full_expression());
             match(tok_clsqbrak);
             cur_tok = getNextToken();
+            while (cur_tok == tok_opsqbrak) {
+                cur_tok = getNextToken();
+                ar.num.push_back(full_expression());
+                match(tok_clsqbrak);
+                cur_tok = getNextToken();
+            }
             return ar.clone();
         }
         case tok_opbrak: {
@@ -54,6 +60,45 @@ ExpAST *Parser::read_var() {
     }
 }
 
+Variable Parser::getType() {
+    Variable a;
+    switch (cur_tok) {
+        case tok_integer: {
+            a.type = Variable::integer;
+            cur_tok = getNextToken();
+            break;
+        }
+        case tok_double: {
+            a.type = Variable::float_number;
+            cur_tok = getNextToken();
+            break;
+        }
+        case tok_array: {
+            cur_tok = getNextToken();
+            match(tok_opsqbrak);
+            cur_tok = getNextToken();
+            a.st = read_int();
+            match(tok_dot);
+            cur_tok = getNextToken();
+            match(tok_dot);
+            cur_tok = getNextToken();
+            a.en = read_int();
+            match(tok_clsqbrak);
+            cur_tok = getNextToken();
+            match(tok_of);
+            cur_tok = getNextToken();
+            a.next = getType().clone();
+            a.type = Variable::array;
+            break;
+        }
+        default: {
+            std::cout << "wrong type of var" << std::endl;
+            throw "";
+        }
+    }
+    return a;
+}
+
 void Parser::start_of_prog() {
     match(tok_program);
     cur_tok = getNextToken();
@@ -65,7 +110,7 @@ void Parser::start_of_prog() {
 }
 
 void Parser::vars() {
-    std::vector <std::string> names;
+    std::vector<std::string> names;
     match(tok_identifier);
     names.push_back(m_Lexer.identifierStr());
     cur_tok = getNextToken();
@@ -77,101 +122,17 @@ void Parser::vars() {
     }
     match(tok_colon);
     cur_tok = getNextToken();
-    switch (cur_tok) {
-        case tok_integer:
-            for (int i = 0; i < names.size(); ++i) {
-                for (auto j = var.begin(); j != var.end(); ++j) {
-                    if (names[i] == j->first) {
-                        std::cout << "var already exist";
-                        throw "";
-                    }
-                }
-                Variable a;
-                a.type = Variable::integer;
-                a.int_val = 0;
-                a.if_const = false;
-                a.exp = nullptr;
-                var.insert(std::make_pair(names[i], a));
+    Variable a = getType();
+    for (int i = 0; i < names.size(); ++i) {
+        for (auto j = var.begin(); j != var.end(); ++j) {
+            if (names[i] == j->first) {
+                std::cout << "var already exist";
+                throw "";
             }
-            names.clear();
-            break;
-        case tok_double:
-            for (int i = 0; i < names.size(); ++i) {
-                for (auto j = var.begin(); j != var.end(); ++j) {
-                    if (names[i] == j->first) {
-                        std::cout << "var already exist";
-                        throw "";
-                    }
-                }
-                Variable a;
-                a.type = Variable::float_number;
-                a.float_val = 0;
-                a.if_const = false;
-                a.exp = nullptr;
-                var.insert(std::make_pair(names[i], a));
-            }
-            names.clear();
-            break;
-        case tok_array:
-            cur_tok = getNextToken();
-            match(tok_opsqbrak);
-            int f, s;
-            cur_tok = getNextToken();
-            f = read_int();
-            match(tok_dot);
-            cur_tok = getNextToken();
-            match(tok_dot);
-            cur_tok = getNextToken();
-            s = read_int();
-            match(tok_clsqbrak);
-            cur_tok = getNextToken();
-            match(tok_of);
-            cur_tok = getNextToken();
-            switch (cur_tok) {
-                case tok_integer:
-                    for (int i = 0; i < names.size(); ++i) {
-                        for (auto j = var.begin(); j != var.end(); ++j) {
-                            if (names[i] == j->first) {
-                                std::cout << "var already exist";
-                                throw "";
-                            }
-                        }
-                        Variable a;
-                        a.type = Variable::array_int;
-                        a.if_const = false;
-                        a.st = f;
-                        a.en = s;
-                        var.insert(std::make_pair(names[i], a));
-                    }
-                    names.clear();
-                    break;
-                case tok_double:
-                    for (int i = 0; i < names.size(); ++i) {
-                        for (auto j = var.begin(); j != var.end(); ++j) {
-                            if (names[i] == j->first) {
-                                std::cout << "var already exist";
-                                throw "";
-                            }
-                        }
-                        Variable a;
-                        a.type = Variable::array_double;
-                        a.if_const = false;
-                        a.st = f;
-                        a.en = s;
-                        var.insert(std::make_pair(names[i], a));
-                    }
-                    names.clear();
-                    break;
-                default:
-                    std::cout << "Error. Unknown type of var";
-                    throw "";
-            }
-            break;
-        default:
-            std::cout << "Error. Unknown type of var";
-            throw "";
+        }
+        var.insert(std::make_pair(names[i], a));
     }
-    cur_tok = getNextToken();
+
     match(tok_semicolon);
     cur_tok = getNextToken();
     while (cur_tok == tok_identifier) {
@@ -186,100 +147,16 @@ void Parser::vars() {
         }
         match(tok_colon);
         cur_tok = getNextToken();
-        switch (cur_tok) {
-            case tok_integer:
-                for (int i = 0; i < names.size(); ++i) {
-                    for (auto j = var.begin(); j != var.end(); ++j) {
-                        if (names[i] == j->first) {
-                            std::cout << "var already exist";
-                            throw "";
-                        }
-                    }
-                    Variable a;
-                    a.type = Variable::integer;
-                    a.int_val = 0;
-                    a.if_const = false;
-                    a.exp = nullptr;
-                    var.insert(std::make_pair(names[i], a));
+        Variable a = getType();
+        for (int i = 0; i < names.size(); ++i) {
+            for (auto j = var.begin(); j != var.end(); ++j) {
+                if (names[i] == j->first) {
+                    std::cout << "var already exist";
+                    throw "";
                 }
-                names.clear();
-                break;
-            case tok_double:
-                for (int i = 0; i < names.size(); ++i) {
-                    for (auto j = var.begin(); j != var.end(); ++j) {
-                        if (names[i] == j->first) {
-                            std::cout << "var already exist";
-                            throw "";
-                        }
-                    }
-                    Variable a;
-                    a.type = Variable::float_number;
-                    a.float_val = 0;
-                    a.if_const = false;
-                    a.exp = nullptr;
-                    var.insert(std::make_pair(names[i], a));
-                }
-                names.clear();
-                break;
-            case tok_array:
-                cur_tok = getNextToken();
-                match(tok_opsqbrak);
-                int f, s;
-                cur_tok = getNextToken();
-                f = read_int();
-                match(tok_dot);
-                cur_tok = getNextToken();
-                match(tok_dot);
-                cur_tok = getNextToken();
-                s = read_int();
-                match(tok_clsqbrak);
-                cur_tok = getNextToken();
-                match(tok_of);
-                cur_tok = getNextToken();
-                switch (cur_tok) {
-                    case tok_integer:
-                        for (int i = 0; i < names.size(); ++i) {
-                            for (auto j = var.begin(); j != var.end(); ++j) {
-                                if (names[i] == j->first) {
-                                    std::cout << "var already exist";
-                                    throw "";
-                                }
-                            }
-                            Variable a;
-                            a.type = Variable::array_int;
-                            a.if_const = false;
-                            a.st = f;
-                            a.en = s;
-                            var.insert(std::make_pair(names[i], a));
-                        }
-                        names.clear();
-                        break;
-                    case tok_double:
-                        for (int i = 0; i < names.size(); ++i) {
-                            for (auto j = var.begin(); j != var.end(); ++j) {
-                                if (names[i] == j->first) {
-                                    std::cout << "var already exist";
-                                    throw "";
-                                }
-                            }
-                            Variable a;
-                            a.type = Variable::array_double;
-                            a.if_const = false;
-                            a.st = f;
-                            a.en = s;
-                            var.insert(std::make_pair(names[i], a));
-                        }
-                        names.clear();
-                        break;
-                    default:
-                        std::cout << "Error. Unknown type of var";
-                        throw "";
-                }
-            default:
-                std::cout << "Error. Unknown type of var";
-                throw "";
+            }
+            var.insert(std::make_pair(names[i], a));
         }
-        cur_tok = getNextToken();
         match(tok_semicolon);
         cur_tok = getNextToken();
     }
@@ -405,8 +282,8 @@ void Parser::vars_and_const() {
     }
 }
 
-std::vector <std::string> arg_ord;
-std::map <std::string, Variable> arg_;
+std::vector<std::string> arg_ord;
+std::map<std::string, Variable> arg_;
 
 void Parser::arg() {
     std::string name;
@@ -417,55 +294,8 @@ void Parser::arg() {
         cur_tok = getNextToken();
         Variable a;
         arg_ord.push_back(name);
-        switch (cur_tok) {
-            case tok_integer: {
-                a.type = Variable::integer;
-                arg_.insert(std::make_pair(name, a));
-                break;
-            }
-            case tok_double: {
-                a.type = Variable::float_number;
-                arg_.insert(std::make_pair(name, a));
-                break;
-            }
-            case tok_array: {
-                cur_tok = getNextToken();
-                match(tok_opsqbrak);
-                cur_tok = getNextToken();
-                a.st = read_int();
-                match(tok_dot);
-                cur_tok = getNextToken();
-                match(tok_dot);
-                cur_tok = getNextToken();
-                a.en = read_int();
-                match(tok_clsqbrak);
-                cur_tok = getNextToken();
-                match(tok_of);
-                cur_tok = getNextToken();
-                switch (cur_tok) {
-                    case tok_integer: {
-                        a.type = Variable::integer;
-                        arg_.insert(std::make_pair(name, a));
-                        break;
-                    }
-                    case tok_double: {
-                        a.type = Variable::float_number;
-                        arg_.insert(std::make_pair(name, a));
-                        break;
-                    }
-                    default: {
-                        std::cout << "Hadn't done array of array or unknown type";
-                        throw "";
-                    }
-                }
-                break;
-            }
-            default: {
-                std::cout << "wrong type of var" << std::endl;
-                throw "";
-            }
-        }
-        cur_tok = getNextToken();
+        a = getType();
+        arg_.insert(std::make_pair(name, a));
         while (cur_tok == tok_semicolon) {
             cur_tok = getNextToken();
             match(tok_identifier);
@@ -475,55 +305,8 @@ void Parser::arg() {
             cur_tok = getNextToken();
             Variable a;
             arg_ord.push_back(name);
-            switch (cur_tok) {
-                case tok_integer: {
-                    a.type = Variable::integer;
-                    arg_.insert(std::make_pair(name, a));
-                    break;
-                }
-                case tok_double: {
-                    a.type = Variable::float_number;
-                    arg_.insert(std::make_pair(name, a));
-                    break;
-                }
-                case tok_array: {
-                    cur_tok = getNextToken();
-                    match(tok_opsqbrak);
-                    cur_tok = getNextToken();
-                    a.st = read_int();
-                    match(tok_dot);
-                    cur_tok = getNextToken();
-                    match(tok_dot);
-                    cur_tok = getNextToken();
-                    a.en = read_int();
-                    match(tok_clsqbrak);
-                    cur_tok = getNextToken();
-                    match(tok_of);
-                    cur_tok = getNextToken();
-                    switch (cur_tok) {
-                        case tok_integer: {
-                            a.type = Variable::integer;
-                            arg_.insert(std::make_pair(name, a));
-                            break;
-                        }
-                        case tok_double: {
-                            a.type = Variable::float_number;
-                            arg_.insert(std::make_pair(name, a));
-                            break;
-                        }
-                        default: {
-                            std::cout << "Handn't done array of array or unknown type";
-                            throw "";
-                        }
-                    }
-                    break;
-                }
-                default: {
-                    std::cout << "wrong type of var" << std::endl;
-                    throw "";
-                }
-            }
-            cur_tok = getNextToken();
+            a = getType();
+            arg_.insert(std::make_pair(name, a));
         }
     }
 }
@@ -547,60 +330,12 @@ Funct *Parser::func() {
             cur_tok = getNextToken();
             match(tok_colon);
             cur_tok = getNextToken();
-            Variable a;
-            switch (cur_tok) {
-                case tok_integer: {
-                    a.type = Variable::integer;
-                    arg_.insert(std::make_pair(p.Name, a));
-                    break;
-                }
-                case tok_double: {
-                    a.type = Variable::float_number;
-                    arg_.insert(std::make_pair(p.Name, a));
-                    break;
-                }
-                case tok_array: {
-                    cur_tok = getNextToken();
-                    match(tok_opsqbrak);
-                    cur_tok = getNextToken();
-                    a.st = read_int();
-                    match(tok_dot);
-                    cur_tok = getNextToken();
-                    match(tok_dot);
-                    cur_tok = getNextToken();
-                    a.en = read_int();
-                    match(tok_clsqbrak);
-                    cur_tok = getNextToken();
-                    match(tok_of);
-                    cur_tok = getNextToken();
-                    switch (cur_tok) {
-                        case tok_integer: {
-                            a.type = Variable::array_int;
-                            arg_.insert(std::make_pair(p.Name, a));
-                            break;
-                        }
-                        case tok_double: {
-                            a.type = Variable::array_double;
-                            arg_.insert(std::make_pair(p.Name, a));
-                            break;
-                        }
-                        default: {
-                            std::cout << "Handn't done array of array or unknown type";
-                            throw "";
-                        }
-                    }
-                    break;
-                }
-                default: {
-                    std::cout << "wrong type of var" << std::endl;
-                    throw "";
-                }
-            }
+            Variable a = getType();
+            arg_.insert(std::make_pair(p.Name, a));
             p.Args_order = arg_ord;
             p.Args = arg_;
             arg_ord.clear();
             arg_.clear();
-            cur_tok = getNextToken();
             match(tok_semicolon);
             cur_tok = getNextToken();
             vars_and_const();
@@ -1133,7 +868,7 @@ const llvm::Module &Parser::Generate() {
 
     // create writecln function
     {
-        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writecln", MilaModule);
         for (auto &Arg: F->args())
@@ -1142,7 +877,7 @@ const llvm::Module &Parser::Generate() {
 
     // create writec function
     {
-        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writec", MilaModule);
         for (auto &Arg: F->args())
@@ -1151,7 +886,7 @@ const llvm::Module &Parser::Generate() {
 
     // create writeln function
     {
-        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writeln", MilaModule);
         for (auto &Arg: F->args())
@@ -1160,7 +895,7 @@ const llvm::Module &Parser::Generate() {
 
     // create write function
     {
-        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "write", MilaModule);
         for (auto &Arg: F->args())
@@ -1168,7 +903,7 @@ const llvm::Module &Parser::Generate() {
     }
     //create readln function
     {
-        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32PtrTy(MilaContext));
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32PtrTy(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "readln", MilaModule);
         for (auto &Arg: F->args())
@@ -1177,7 +912,7 @@ const llvm::Module &Parser::Generate() {
 
     // create writefln function
     {
-        std::vector < llvm::Type * > Floats(1, llvm::Type::getDoubleTy(MilaContext));
+        std::vector<llvm::Type *> Floats(1, llvm::Type::getDoubleTy(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Floats, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writefln", MilaModule);
         for (auto &Arg: F->args())
@@ -1186,7 +921,7 @@ const llvm::Module &Parser::Generate() {
 
     // create writef function
     {
-        std::vector < llvm::Type * > Floats(1, llvm::Type::getDoubleTy(MilaContext));
+        std::vector<llvm::Type *> Floats(1, llvm::Type::getDoubleTy(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Floats, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writef", MilaModule);
         for (auto &Arg: F->args())
@@ -1194,7 +929,7 @@ const llvm::Module &Parser::Generate() {
     }
     //create readfln function
     {
-        std::vector < llvm::Type * > Floats(1, llvm::Type::getDoublePtrTy(MilaContext));
+        std::vector<llvm::Type *> Floats(1, llvm::Type::getDoublePtrTy(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Floats, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "readfln", MilaModule);
         for (auto &Arg: F->args())
@@ -1203,7 +938,7 @@ const llvm::Module &Parser::Generate() {
 
     //create cast to double func
     {
-        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getDoubleTy(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "int_to_double", MilaModule);
         for (auto &Arg: F->args())
@@ -1212,7 +947,7 @@ const llvm::Module &Parser::Generate() {
 
     //create to cast to int func
     {
-        std::vector < llvm::Type * > Floats(1, llvm::Type::getDoubleTy(MilaContext));
+        std::vector<llvm::Type *> Floats(1, llvm::Type::getDoubleTy(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Floats, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "double_to_int", MilaModule);
         for (auto &Arg: F->args())
