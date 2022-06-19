@@ -126,12 +126,13 @@ void Parser::vars() {
     for (int i = 0; i < names.size(); ++i) {
         for (auto j = var.begin(); j != var.end(); ++j) {
             if (names[i] == j->first) {
-                std::cout << "var already exist";
+                std::cout << "var already exist " << j->first;
                 throw "";
             }
         }
         var.insert(std::make_pair(names[i], a));
     }
+    names.clear();
 
     match(tok_semicolon);
     cur_tok = getNextToken();
@@ -151,12 +152,13 @@ void Parser::vars() {
         for (int i = 0; i < names.size(); ++i) {
             for (auto j = var.begin(); j != var.end(); ++j) {
                 if (names[i] == j->first) {
-                    std::cout << "var already exist";
+                    std::cout << "var already exist " << j->first;
                     throw "";
                 }
             }
             var.insert(std::make_pair(names[i], a));
         }
+        names.clear();
         match(tok_semicolon);
         cur_tok = getNextToken();
     }
