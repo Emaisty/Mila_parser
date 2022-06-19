@@ -726,14 +726,18 @@ public:
             }
         } else {
             ArrayElAST *al = dynamic_cast<ArrayElAST *>(var);
-            GlobalValue *B = GlobNamedValues[al->name].glob;
+            Value *A = GlobNamedValues[al->name].glob, *B = NamedValues[al->name].alloca, *C;
+            if (A)
+                C = A;
+            else
+                C = B;
 
             Value *a = MilaBuilder.CreateSub(al->num->codegen(MilaContext, MilaBuilder, MilaModule),
                                              ConstantInt::get(MilaContext, APInt(32, GlobNamedValues[al->name].st)));
             Value *i32zero = ConstantInt::get(MilaContext, APInt(32, 0));
             Value *indices[2] = {i32zero, a};
 
-            auto i = MilaBuilder.CreateInBoundsGEP(B, ArrayRef<Value *>(indices, 2));
+            auto i = MilaBuilder.CreateInBoundsGEP(C, ArrayRef<Value *>(indices, 2));
             if (i->getType()->getPointerElementType()->isIntegerTy() && Val->getType()->isDoubleTy()) {
                 IntCastCallAST d;
                 d.exp = exp;
@@ -851,7 +855,18 @@ public:
             else
                 all = L2;
         } else {
+            Value *A = GlobNamedValues[el->name].glob, *B = NamedValues[el->name].alloca, *C;
+            if (A)
+                C = A;
+            else
+                C = B;
 
+            Value *a = MilaBuilder.CreateSub(el->num->codegen(MilaContext, MilaBuilder, MilaModule),
+                                             ConstantInt::get(MilaContext, APInt(32, GlobNamedValues[el->name].st)));
+            Value *i32zero = ConstantInt::get(MilaContext, APInt(32, 0));
+            Value *indices[2] = {i32zero, a};
+
+            all = MilaBuilder.CreateInBoundsGEP(C, ArrayRef<Value *>(indices, 2));
         }
         if (L->getType()->isIntegerTy())
             r = MilaBuilder.CreateICmpEQ(L, res, "eqtmp");
@@ -867,7 +882,7 @@ public:
                     MilaBuilder.CreateAdd(L, ConstantInt::get(MilaContext, APInt(32, 1)), "addtmp"), all);
         else
             MilaBuilder.CreateStore(
-                    MilaBuilder.CreateSub(L, ConstantInt::get(MilaContext, APInt(32, 1)), "addtmp"), all);
+                    MilaBuilder.CreateSub(L, ConstantInt::get(MilaContext, APInt(32, 1)), "subtmp"), all);
 
         MilaBuilder.CreateBr(CondBB);
         TheFunction->getBasicBlockList().push_back(ExitBB);

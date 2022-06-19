@@ -575,12 +575,12 @@ Funct *Parser::func() {
                     cur_tok = getNextToken();
                     switch (cur_tok) {
                         case tok_integer: {
-                            a.type = Variable::integer;
+                            a.type = Variable::array_int;
                             arg_.insert(std::make_pair(p.Name, a));
                             break;
                         }
                         case tok_double: {
-                            a.type = Variable::float_number;
+                            a.type = Variable::array_double;
                             arg_.insert(std::make_pair(p.Name, a));
                             break;
                         }
