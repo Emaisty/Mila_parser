@@ -1251,7 +1251,6 @@ public:
     }
 
     void codegen(llvm::LLVMContext &MilaContext, llvm::IRBuilder<> &MilaBuilder, llvm::Module &MilaModule) {
-        //vars->codegen();
         main->codegen(MilaContext, MilaBuilder, MilaModule);
     }
 

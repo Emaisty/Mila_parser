@@ -65,7 +65,7 @@ void Parser::start_of_prog() {
 }
 
 void Parser::vars() {
-    std::vector<std::string> names;
+    std::vector <std::string> names;
     match(tok_identifier);
     names.push_back(m_Lexer.identifierStr());
     cur_tok = getNextToken();
@@ -405,8 +405,8 @@ void Parser::vars_and_const() {
     }
 }
 
-std::vector<std::string> arg_ord;
-std::map<std::string, Variable> arg_;
+std::vector <std::string> arg_ord;
+std::map <std::string, Variable> arg_;
 
 void Parser::arg() {
     std::string name;
@@ -607,6 +607,8 @@ Funct *Parser::func() {
             p.Vars = var;
             f.Body = command();
             var.clear();
+            match(tok_semicolon);
+            cur_tok = getNextToken();
         } else {
             cur_tok = getNextToken();
             match(tok_identifier);
@@ -628,6 +630,8 @@ Funct *Parser::func() {
             p.Vars = var;
             f.Body = command();
             var.clear();
+            match(tok_semicolon);
+            cur_tok = getNextToken();
         }
         f.Proto = p.clone();
         res.func.push_back(f.clone());
@@ -947,8 +951,6 @@ ComandAST *Parser::command() {
                     }
                     match(tok_clbrak);
                     cur_tok = getNextToken();
-                    match(tok_semicolon);
-                    cur_tok = getNextToken();
                     return proc.clone();
                 }
 
@@ -958,32 +960,24 @@ ComandAST *Parser::command() {
             AssignAST assign;
             assign.var = id;
             assign.exp = full_expression();
-            match(tok_semicolon);
-            cur_tok = getNextToken();
             return assign.clone();
         }
         case tok_write: {
             cur_tok = getNextToken();
             WriteAST write;
             write.exp = writeln();
-            match(tok_semicolon);
-            cur_tok = getNextToken();
             return write.clone();
         }
         case tok_writeln: {
             cur_tok = getNextToken();
             WritelnAST write;
             write.exp = writeln();
-            match(tok_semicolon);
-            cur_tok = getNextToken();
             return write.clone();
         }
         case tok_readln: {
             cur_tok = getNextToken();
             ReadAST read;
             read.var = readln();
-            match(tok_semicolon);
-            cur_tok = getNextToken();
             return read.clone();
         }
         case tok_dec: {
@@ -993,8 +987,6 @@ ComandAST *Parser::command() {
             cur_tok = getNextToken();
             dec.var = read_var();
             match(tok_clbrak);
-            cur_tok = getNextToken();
-            match(tok_semicolon);
             cur_tok = getNextToken();
             return dec.clone();
         }
@@ -1055,21 +1047,22 @@ ComandAST *Parser::command() {
             ComandAST *cmd;
             cmd = command();
             block.commands.push_back(cmd);
-            cmd = command();
-            while (cmd) {
-                block.commands.push_back(cmd);
-                cmd = command();
+            if (cur_tok == tok_semicolon) {
+                cur_tok = getNextToken();
+                while (cmd = command()) {
+                    block.commands.push_back(cmd);
+                    if (cur_tok == tok_semicolon)
+                        cur_tok = getNextToken();
+                    else
+                        break;
+                }
             }
             match(tok_end);
-            cur_tok = getNextToken();
-            match(tok_semicolon);
             cur_tok = getNextToken();
             return block.clone();
         }
         case tok_exit: {
             ExitAST ex;
-            cur_tok = getNextToken();
-            match(tok_semicolon);
             cur_tok = getNextToken();
             return ex.clone();
         }
@@ -1096,8 +1089,16 @@ Prog *Parser::body() {
     cur_tok = getNextToken();
     ComandAST *cmd = command();
     main.commands.push_back(cmd);
-    while (cmd = command())
-        main.commands.push_back(cmd);
+    if (cur_tok == tok_semicolon) {
+        cur_tok = getNextToken();
+        while (cmd = command()) {
+            main.commands.push_back(cmd);
+            if (cur_tok == tok_semicolon)
+                cur_tok = getNextToken();
+            else
+                break;
+        }
+    }
     match(tok_end);
     cur_tok = getNextToken();
     match(tok_dot);
@@ -1132,7 +1133,7 @@ const llvm::Module &Parser::Generate() {
 
     // create writecln function
     {
-        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writecln", MilaModule);
         for (auto &Arg: F->args())
@@ -1141,7 +1142,7 @@ const llvm::Module &Parser::Generate() {
 
     // create writec function
     {
-        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writec", MilaModule);
         for (auto &Arg: F->args())
@@ -1150,7 +1151,7 @@ const llvm::Module &Parser::Generate() {
 
     // create writeln function
     {
-        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writeln", MilaModule);
         for (auto &Arg: F->args())
@@ -1159,7 +1160,7 @@ const llvm::Module &Parser::Generate() {
 
     // create write function
     {
-        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "write", MilaModule);
         for (auto &Arg: F->args())
@@ -1167,7 +1168,7 @@ const llvm::Module &Parser::Generate() {
     }
     //create readln function
     {
-        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32PtrTy(MilaContext));
+        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32PtrTy(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "readln", MilaModule);
         for (auto &Arg: F->args())
@@ -1176,7 +1177,7 @@ const llvm::Module &Parser::Generate() {
 
     // create writefln function
     {
-        std::vector<llvm::Type *> Floats(1, llvm::Type::getDoubleTy(MilaContext));
+        std::vector < llvm::Type * > Floats(1, llvm::Type::getDoubleTy(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Floats, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writefln", MilaModule);
         for (auto &Arg: F->args())
@@ -1185,7 +1186,7 @@ const llvm::Module &Parser::Generate() {
 
     // create writef function
     {
-        std::vector<llvm::Type *> Floats(1, llvm::Type::getDoubleTy(MilaContext));
+        std::vector < llvm::Type * > Floats(1, llvm::Type::getDoubleTy(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Floats, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "writef", MilaModule);
         for (auto &Arg: F->args())
@@ -1193,7 +1194,7 @@ const llvm::Module &Parser::Generate() {
     }
     //create readfln function
     {
-        std::vector<llvm::Type *> Floats(1, llvm::Type::getDoublePtrTy(MilaContext));
+        std::vector < llvm::Type * > Floats(1, llvm::Type::getDoublePtrTy(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Floats, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "readfln", MilaModule);
         for (auto &Arg: F->args())
@@ -1202,7 +1203,7 @@ const llvm::Module &Parser::Generate() {
 
     //create cast to double func
     {
-        std::vector<llvm::Type *> Ints(1, llvm::Type::getInt32Ty(MilaContext));
+        std::vector < llvm::Type * > Ints(1, llvm::Type::getInt32Ty(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getDoubleTy(MilaContext), Ints, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "int_to_double", MilaModule);
         for (auto &Arg: F->args())
@@ -1211,7 +1212,7 @@ const llvm::Module &Parser::Generate() {
 
     //create to cast to int func
     {
-        std::vector<llvm::Type *> Floats(1, llvm::Type::getDoubleTy(MilaContext));
+        std::vector < llvm::Type * > Floats(1, llvm::Type::getDoubleTy(MilaContext));
         llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getInt32Ty(MilaContext), Floats, false);
         llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, "double_to_int", MilaModule);
         for (auto &Arg: F->args())
